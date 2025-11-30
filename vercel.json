@@ -1,0 +1,10 @@
+{
+  "buildCommand": "prisma generate && next build",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}
+

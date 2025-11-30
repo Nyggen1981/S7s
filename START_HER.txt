@@ -1,0 +1,109 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║          🏔️  SAUDA SEVEN SUMMITS  🏔️                         ║
+║                                                               ║
+║              Velkommen til din nye app!                       ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+
+📋 START APPEN (velg ein metode):
+
+┌───────────────────────────────────────────────────────────────┐
+│  METODE 1: Automatisk setup (ANBEFALT)                       │
+└───────────────────────────────────────────────────────────────┘
+
+1. Opne PowerShell i denne mappa
+2. Kjør: .\setup.ps1
+3. Kjør: npm run dev
+4. Opne: http://localhost:3000
+
+
+┌───────────────────────────────────────────────────────────────┐
+│  METODE 2: Manuell setup                                      │
+└───────────────────────────────────────────────────────────────┘
+
+1. npm install
+2. Copy-Item S7S.png public\S7S.png
+3. npx prisma generate
+4. npx prisma db push
+5. npx tsx prisma/seed.ts
+6. npm run dev
+7. Opne: http://localhost:3000
+
+
+═══════════════════════════════════════════════════════════════
+
+📚 VIKTIGE FILER:
+
+  QUICK_START.md     ⚡ Rask start guide (2 minutt)
+  SETUP_GUIDE.md     📖 Detaljert oppsettguide
+  README.md          📚 Fullstendig dokumentasjon
+  FEATURES.md        ✨ Oversikt over alle funksjonar
+  PROJECT_STRUCTURE.md  📁 Prosjektstruktur
+
+
+═══════════════════════════════════════════════════════════════
+
+🔐 ADMIN-INNLOGGING:
+
+  URL:      http://localhost:3000/admin/login
+  E-post:   admin@saudasevensummits.no
+  Passord:  ChangeThisPassword123!
+
+  ⚠️  ENDRE PASSORDET I .env FØR PRODUKSJON!
+
+
+═══════════════════════════════════════════════════════════════
+
+⚙️  VIKTIGE INNSTILLINGAR:
+
+1. Rediger .env fila for å konfigurere:
+   - Admin passord (VIKTIG!)
+   - E-post innstillingar (SMTP)
+   - NextAuth secret (for produksjon)
+
+2. Tilpass fjellnamna i prisma/seed.ts
+
+3. Test at alt fungerer før deploy
+
+
+═══════════════════════════════════════════════════════════════
+
+✅ SJEKKLISTE:
+
+  [ ] Appen installert og køyrer
+  [ ] Testa brukarregistrering
+  [ ] Testa opplasting av bilete
+  [ ] Logga inn på admin-panel
+  [ ] Testa Excel-eksport
+  [ ] SMTP konfigurert (valgfritt, men anbefalt)
+  [ ] Sjekka at dei 7 riktige fjella er i databasen
+  [ ] Admin-passord endra
+
+
+═══════════════════════════════════════════════════════════════
+
+🚀 KLAR FOR DEPLOY?
+
+  Sjå SETUP_GUIDE.md for instruksjonar om:
+  - Deploy til Vercel/Railway
+  - Produksjonsdatabase setup
+  - Miljøvariablar
+  - SSL/HTTPS oppsett
+
+
+═══════════════════════════════════════════════════════════════
+
+📞 TRENG HJELP?
+
+  Les SETUP_GUIDE.md for detaljert feilsøking
+  eller README.md for fullstendig dokumentasjon.
+
+
+═══════════════════════════════════════════════════════════════
+
+              Lykke til med Sauda Seven Summits! 🎉
+
+═══════════════════════════════════════════════════════════════
+

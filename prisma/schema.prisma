@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String          @id @default(cuid())
+  name            String
+  email           String          @unique
+  phone           String
+  tshirtSize      String          // XS, S, M, L, XL, XXL
+  hasPaid         Boolean         @default(false) // Payment status for catalog access
+  paidAt          DateTime?       // When payment was approved
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  completedAt     DateTime?       // When they completed all 7 peaks
+  submissions     Submission[]
+  
+  @@index([email])
+  @@index([hasPaid])
+}
+
+model Peak {
+  id              String          @id @default(cuid())
+  name            String          @unique
+  description     String?
+  elevation       Int?            // meters above sea level
+  order           Int             @unique // 1-7
+  createdAt       DateTime        @default(now())
+  submissions     Submission[]
+}
+
+model Submission {
+  id              String          @id @default(cuid())
+  userId          String
+  peakId          String
+  imagePath       String          // Path to uploaded image
+  submittedAt     DateTime        @default(now())
+  latitude        Float?          // Optional GPS coordinates
+  longitude       Float?
+  notes           String?
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  peak            Peak            @relation(fields: [peakId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, peakId]) // Each user can only submit each peak once
+  @@index([userId])
+  @@index([peakId])
+  @@index([submittedAt])
+}
+
+model Admin {
+  id              String          @id @default(cuid())
+  email           String          @unique
+  password        String          // Hashed password
+  name            String
+  createdAt       DateTime        @default(now())
+}
+
+
+
