@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -12,10 +13,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        console.log('Auth attempt for:', credentials?.email)
-        
         if (!credentials?.email || !credentials?.password) {
-          console.log('Missing credentials')
           return null
         }
 
@@ -24,10 +22,7 @@ export const authOptions: NextAuthOptions = {
             where: { email: credentials.email }
           })
 
-          console.log('Admin found:', !!admin)
-
           if (!admin) {
-            console.log('No admin with this email')
             return null
           }
 
@@ -35,8 +30,6 @@ export const authOptions: NextAuthOptions = {
             credentials.password,
             admin.password
           )
-
-          console.log('Password valid:', isPasswordValid)
 
           if (!isPasswordValid) {
             return null
@@ -59,13 +52,8 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/admin/login',
-    error: '/admin/login',
   },
   callbacks: {
-    async signIn({ user }) {
-      console.log('SignIn callback - user:', user?.email)
-      return !!user
-    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
@@ -77,25 +65,6 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
       }
       return session
-    },
-    async redirect({ url, baseUrl }) {
-      console.log('Redirect callback - url:', url, 'baseUrl:', baseUrl)
-      // Always redirect to admin after login
-      if (url.includes('/admin/login') || url === baseUrl) {
-        return `${baseUrl}/admin`
-      }
-      return url.startsWith(baseUrl) ? url : baseUrl
-    }
-  },
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production'
-      }
     }
   }
 }
