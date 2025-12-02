@@ -7,7 +7,8 @@ import {
   Users, 
   Mountain, 
   Trophy, 
-  Download, 
+  Download,
+  Upload,
   LogOut, 
   Search,
   Calendar,
@@ -34,6 +35,7 @@ export default function AdminDashboard() {
   const [sortColumn, setSortColumn] = useState<string>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
 
   useEffect(() => {
@@ -77,6 +79,73 @@ export default function AdminDashboard() {
     } finally {
       setExporting(false)
     }
+  }
+
+  const handleImport = async () => {
+    // Show developer warning
+    const confirmed = confirm(
+      `⚠️ ADVARSEL - KUN FOR UTVIKLAR!\n\n` +
+      `Denne funksjonen er berre for systemutviklar.\n` +
+      `Feil bruk kan føre til tap av data.\n\n` +
+      `Er du sikker på at du vil fortsette?`
+    )
+
+    if (!confirmed) return
+
+    // Create file input and trigger click
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      // Second confirmation with file name
+      const finalConfirm = confirm(
+        `Du er i ferd med å importere:\n${file.name}\n\n` +
+        `Dette vil legge til nye brukarar frå fila.\n` +
+        `Eksisterande brukarar blir IKKJE overskrive.\n\n` +
+        `Fortsett?`
+      )
+
+      if (!finalConfirm) return
+
+      setImporting(true)
+      try {
+        const text = await file.text()
+        const data = JSON.parse(text)
+
+        const response = await fetch('/api/admin/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Import feila')
+        }
+
+        alert(
+          `✅ Import fullført!\n\n` +
+          `Importerte brukarar: ${result.stats.importedUsers}\n` +
+          `Importerte bestigningar: ${result.stats.importedSubmissions}\n` +
+          `Hoppa over (finst allereie): ${result.stats.skippedUsers}`
+        )
+
+        // Reload users
+        await loadUsers()
+      } catch (error: any) {
+        console.error('Import failed:', error)
+        alert(`❌ Import feila: ${error.message}`)
+      } finally {
+        setImporting(false)
+      }
+    }
+
+    input.click()
   }
 
   const handleSort = (column: string) => {
@@ -240,7 +309,17 @@ export default function AdminDashboard() {
               >
                 <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">{exporting ? 'Eksporterer...' : 'Eksporter'}</span>
-                <span className="sm:hidden">Excel</span>
+                <span className="sm:hidden">↓</span>
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing}
+                className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white px-4 md:px-6 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm md:text-base"
+                title="Kun for utviklar"
+              >
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">{importing ? 'Importerer...' : 'Importer'}</span>
+                <span className="sm:hidden">↑</span>
               </button>
               <button
                 onClick={handleLogout}
