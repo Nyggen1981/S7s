@@ -74,6 +74,10 @@ export const authOptions: NextAuthOptions = {
     error: '/admin/login',
   },
   callbacks: {
+    async signIn({ user }) {
+      console.log('SignIn callback - user:', user?.email)
+      return !!user
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
@@ -85,6 +89,25 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
       }
       return session
+    },
+    async redirect({ url, baseUrl }) {
+      console.log('Redirect callback - url:', url, 'baseUrl:', baseUrl)
+      // Always redirect to admin after login
+      if (url.includes('/admin/login') || url === baseUrl) {
+        return `${baseUrl}/admin`
+      }
+      return url.startsWith(baseUrl) ? url : baseUrl
+    }
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production'
+      }
     }
   }
 }
