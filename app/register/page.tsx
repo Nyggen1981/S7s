@@ -13,7 +13,9 @@ export default function RegisterPage() {
     name: '',
     email: '',
     phone: '',
-    tshirtSize: 'M'
+    tshirtSize: 'M',
+    password: '',
+    confirmPassword: ''
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -23,13 +25,32 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
+    // Validate passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passorda må vere like')
+      setLoading(false)
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError('Passord må vere minst 6 teikn')
+      setLoading(false)
+      return
+    }
+
     try {
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          tshirtSize: formData.tshirtSize,
+          password: formData.password
+        }),
       })
 
       const data = await response.json()
@@ -38,9 +59,19 @@ export default function RegisterPage() {
         throw new Error(data.error || 'Noko gjekk galt')
       }
 
-      // Save email to localStorage and redirect to dashboard
-      localStorage.setItem('s7s_user_email', formData.email)
-      router.push(`/dashboard?email=${encodeURIComponent(formData.email)}&new=true`)
+      // Auto-login after registration
+      const loginResponse = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      })
+      
+      if (loginResponse.ok) {
+        const userData = await loginResponse.json()
+        localStorage.setItem('s7s_user_session', JSON.stringify(userData))
+      }
+      
+      router.push('/dashboard?new=true')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -111,9 +142,38 @@ export default function RegisterPage() {
                 className="w-full px-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
                 placeholder="ola@example.com"
               />
-              <p className="text-sm text-mountain-500 mt-1">
-                Bruk denne e-posten for å sjå din framdrift seinare
-              </p>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-mountain-700 mb-2">
+                Passord *
+              </label>
+              <input
+                type="password"
+                id="password"
+                required
+                minLength={6}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full px-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                placeholder="Minst 6 teikn"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-mountain-700 mb-2">
+                Bekreft passord *
+              </label>
+              <input
+                type="password"
+                id="confirmPassword"
+                required
+                minLength={6}
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                className="w-full px-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition"
+                placeholder="Skriv passordet på nytt"
+              />
             </div>
 
             <div>

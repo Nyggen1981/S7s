@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendWelcomeEmail } from '@/lib/email'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, phone, tshirtSize } = body
+    const { name, email, phone, tshirtSize, password } = body
 
     // Validation
-    if (!name || !email || !phone || !tshirtSize) {
+    if (!name || !email || !phone || !tshirtSize || !password) {
       return NextResponse.json(
         { error: 'Alle felt må fylles ut' },
+        { status: 400 }
+      )
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: 'Passord må vere minst 6 teikn' },
         { status: 400 }
       )
     }
@@ -27,6 +36,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -34,6 +46,7 @@ export async function POST(request: NextRequest) {
         email,
         phone,
         tshirtSize,
+        password: hashedPassword,
       }
     })
 

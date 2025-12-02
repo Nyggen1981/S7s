@@ -12,6 +12,7 @@ function DashboardContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [user, setUser] = useState<any>(null)
   const [peaks, setPeaks] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -26,45 +27,35 @@ function DashboardContent() {
   const [initialLoad, setInitialLoad] = useState(true)
   const isNew = searchParams.get('new') === 'true'
 
-  // Load saved email on mount
+  // Load saved user session on mount
   useEffect(() => {
-    const savedEmail = localStorage.getItem('s7s_user_email')
-    const urlEmail = searchParams.get('email')
+    const savedUser = localStorage.getItem('s7s_user_session')
     
-    if (urlEmail) {
-      setEmail(urlEmail)
-      setLoading(true) // Start loading immediately
-      localStorage.setItem('s7s_user_email', urlEmail)
-    } else if (savedEmail) {
-      setEmail(savedEmail)
-      setLoading(true) // Start loading immediately
+    if (savedUser) {
+      try {
+        const userData = JSON.parse(savedUser)
+        setUser(userData)
+        setEmail(userData.email)
+        loadPeaks()
+        // Refresh user data in background
+        refreshUserData(userData.email)
+      } catch (e) {
+        localStorage.removeItem('s7s_user_session')
+      }
     }
     setInitialLoad(false)
   }, [])
 
-  useEffect(() => {
-    if (email && !user) {
-      loadUserData()
-    }
-    if (email) {
-      loadPeaks()
-    }
-  }, [email])
-
-  const loadUserData = async () => {
-    setLoading(true)
-    setError('')
+  const refreshUserData = async (userEmail: string) => {
     try {
-      const response = await fetch(`/api/user?email=${encodeURIComponent(email)}`)
-      if (!response.ok) {
-        throw new Error('Brukar ikkje funne')
+      const response = await fetch(`/api/user?email=${encodeURIComponent(userEmail)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data)
+        localStorage.setItem('s7s_user_session', JSON.stringify(data))
       }
-      const data = await response.json()
-      setUser(data)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+    } catch (err) {
+      console.error('Failed to refresh user data:', err)
     }
   }
 
@@ -78,16 +69,42 @@ function DashboardContent() {
     }
   }
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    localStorage.setItem('s7s_user_email', email)
-    loadUserData()
+    setLoading(true)
+    setError('')
+    
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Innlogging feila')
+      }
+
+      // Save user session
+      localStorage.setItem('s7s_user_session', JSON.stringify(data))
+      setUser(data)
+      loadPeaks()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
   
   const handleLogout = () => {
-    localStorage.removeItem('s7s_user_email')
+    localStorage.removeItem('s7s_user_session')
     setUser(null)
     setEmail('')
+    setPassword('')
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,7 +202,7 @@ function DashboardContent() {
               </div>
             )}
 
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-semibold text-mountain-700 mb-2">
                   E-postadresse
@@ -201,12 +218,27 @@ function DashboardContent() {
                 />
               </div>
 
+              <div>
+                <label htmlFor="password" className="block text-sm font-semibold text-mountain-700 mb-2">
+                  Passord
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  placeholder="Ditt passord"
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 px-6 rounded-lg font-semibold transition-all disabled:opacity-50"
               >
-                {loading ? 'Søker...' : 'Sjå framdrift'}
+                {loading ? 'Loggar inn...' : 'Logg inn'}
               </button>
             </form>
 

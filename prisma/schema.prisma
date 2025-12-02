@@ -14,6 +14,7 @@ model User {
   id              String          @id @default(cuid())
   name            String
   email           String          @unique
+  password        String          // Hashed password
   phone           String
   tshirtSize      String          // XS, S, M, L, XL, XXL
   hasPaid         Boolean         @default(false) // Payment status for catalog access

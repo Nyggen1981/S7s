@@ -9,7 +9,6 @@ import { TSHIRT_SIZES } from '@/lib/utils'
 function ProfileContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [email, setEmail] = useState('')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -22,27 +21,29 @@ function ProfileContent() {
     tshirtSize: 'M'
   })
 
-  // Load saved email on mount
+  // Load saved user session on mount
   useEffect(() => {
-    const savedEmail = localStorage.getItem('s7s_user_email')
-    const urlEmail = searchParams.get('email')
+    const savedUser = localStorage.getItem('s7s_user_session')
     
-    if (urlEmail) {
-      setEmail(urlEmail)
-      setLoading(true)
-      localStorage.setItem('s7s_user_email', urlEmail)
-    } else if (savedEmail) {
-      setEmail(savedEmail)
-      setLoading(true)
+    if (savedUser) {
+      try {
+        const userData = JSON.parse(savedUser)
+        setUser(userData)
+        setFormData({
+          name: userData.name,
+          phone: userData.phone,
+          tshirtSize: userData.tshirtSize
+        })
+      } catch (e) {
+        // If no valid session, redirect to dashboard to login
+        router.push('/dashboard')
+      }
+    } else {
+      // No session, redirect to login
+      router.push('/dashboard')
     }
     setInitialLoad(false)
   }, [])
-
-  useEffect(() => {
-    if (email && !user) {
-      loadUserData()
-    }
-  }, [email])
 
   useEffect(() => {
     if (user) {
@@ -53,29 +54,6 @@ function ProfileContent() {
       })
     }
   }, [user])
-
-  const loadUserData = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const response = await fetch(`/api/user?email=${encodeURIComponent(email)}`)
-      if (!response.ok) {
-        throw new Error('Brukar ikkje funne')
-      }
-      const data = await response.json()
-      setUser(data)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    localStorage.setItem('s7s_user_email', email)
-    loadUserData()
-  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -116,8 +94,8 @@ function ProfileContent() {
     setEditing(false)
   }
 
-  // Show loading while checking auth or loading user data
-  if (initialLoad || (email && !user && loading)) {
+  // Show loading while checking auth
+  if (initialLoad || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
         <div className="text-center">
@@ -128,7 +106,9 @@ function ProfileContent() {
     )
   }
 
-  if (!user) {
+  // This section is kept for backwards compatibility but won't be reached
+  // since we redirect to /dashboard if not logged in
+  if (false) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 py-12 px-4">
         <div className="max-w-md mx-auto">
