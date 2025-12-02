@@ -30,9 +30,9 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in-progress' | 'not-started'>('all')
   const [showUnpaid, setShowUnpaid] = useState(true)
-  const [tshirtFilter, setTshirtFilter] = useState<string>('all')
+  const [sortColumn, setSortColumn] = useState<string>('createdAt')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [exporting, setExporting] = useState(false)
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
 
@@ -79,22 +79,65 @@ export default function AdminDashboard() {
     }
   }
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.phone.includes(searchTerm)
-    
-    const matchesFilter = filterStatus === 'all' ||
-                         (filterStatus === 'completed' && user.completedAt) ||
-                         (filterStatus === 'in-progress' && !user.completedAt && user.submissions.length > 0) ||
-                         (filterStatus === 'not-started' && user.submissions.length === 0)
-    
-    const matchesPayment = showUnpaid || user.hasPaid
-    
-    const matchesTshirt = tshirtFilter === 'all' || user.tshirtSize === tshirtFilter
-    
-    return matchesSearch && matchesFilter && matchesPayment && matchesTshirt
-  })
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const filteredUsers = users
+    .filter(user => {
+      const matchesSearch = searchTerm === '' ||
+                           user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           user.phone.includes(searchTerm) ||
+                           user.tshirtSize.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesPayment = showUnpaid || user.hasPaid
+      
+      return matchesSearch && matchesPayment
+    })
+    .sort((a, b) => {
+      let aVal: any, bVal: any
+      
+      switch (sortColumn) {
+        case 'name':
+          aVal = a.name.toLowerCase()
+          bVal = b.name.toLowerCase()
+          break
+        case 'email':
+          aVal = a.email.toLowerCase()
+          bVal = b.email.toLowerCase()
+          break
+        case 'tshirtSize':
+          const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+          aVal = sizeOrder.indexOf(a.tshirtSize)
+          bVal = sizeOrder.indexOf(b.tshirtSize)
+          break
+        case 'submissions':
+          aVal = a.submissions.length
+          bVal = b.submissions.length
+          break
+        case 'hasPaid':
+          aVal = a.hasPaid ? 1 : 0
+          bVal = b.hasPaid ? 1 : 0
+          break
+        case 'createdAt':
+          aVal = new Date(a.createdAt).getTime()
+          bVal = new Date(b.createdAt).getTime()
+          break
+        default:
+          aVal = a.createdAt
+          bVal = b.createdAt
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
 
   const stats = {
     total: users.length,
@@ -105,11 +148,15 @@ export default function AdminDashboard() {
     unpaid: users.filter(u => !u.hasPaid).length,
   }
 
-  const tshirtSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
-  const tshirtStats = tshirtSizes.reduce((acc, size) => {
-    acc[size] = users.filter(u => u.tshirtSize === size).length
-    return acc
-  }, {} as Record<string, number>)
+  const SortIcon = ({ column }: { column: string }) => (
+    <span className="ml-1 inline-flex flex-col text-xs">
+      {sortColumn === column ? (
+        sortDirection === 'asc' ? '▲' : '▼'
+      ) : (
+        <span className="text-mountain-300">⇅</span>
+      )}
+    </span>
+  )
 
   const handleApprovePayment = async (userId: string, approved: boolean) => {
     try {
@@ -282,119 +329,55 @@ export default function AdminDashboard() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          {/* Search */}
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-mountain-400" />
-              <input
-                type="text"
-                placeholder="Søk etter namn, e-post eller telefon..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Status Filter */}
-            <div>
-              <p className="text-sm font-medium text-mountain-700 mb-2">Framdrift:</p>
-              <div className="flex gap-1 flex-wrap">
-                <button
-                  onClick={() => setFilterStatus('all')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    filterStatus === 'all'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                  }`}
-                >
-                  Alle
-                </button>
-                <button
-                  onClick={() => setFilterStatus('completed')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    filterStatus === 'completed'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                  }`}
-                >
-                  Fullført ({stats.completed})
-                </button>
-                <button
-                  onClick={() => setFilterStatus('in-progress')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    filterStatus === 'in-progress'
-                      ? 'bg-yellow-600 text-white'
-                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                  }`}
-                >
-                  I gang ({stats.inProgress})
-                </button>
-                <button
-                  onClick={() => setFilterStatus('not-started')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    filterStatus === 'not-started'
-                      ? 'bg-gray-600 text-white'
-                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                  }`}
-                >
-                  Ikkje starta ({stats.notStarted})
-                </button>
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            {/* Search */}
+            <div className="flex-1 w-full">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-mountain-400" />
+                <input
+                  type="text"
+                  placeholder="Søk etter namn, e-post, telefon eller t-skjorte størrelse..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                />
               </div>
-            </div>
-
-            {/* T-shirt Filter */}
-            <div>
-              <p className="text-sm font-medium text-mountain-700 mb-2">T-skjorte størrelse:</p>
-              <select
-                value={tshirtFilter}
-                onChange={(e) => setTshirtFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
-              >
-                <option value="all">Alle storleikar</option>
-                {tshirtSizes.map(size => (
-                  <option key={size} value={size}>
-                    {size} ({tshirtStats[size] || 0})
-                  </option>
-                ))}
-              </select>
             </div>
 
             {/* Payment Checkbox */}
-            <div>
-              <p className="text-sm font-medium text-mountain-700 mb-2">Betaling:</p>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showUnpaid}
-                    onChange={(e) => setShowUnpaid(e.target.checked)}
-                    className="w-5 h-5 rounded border-mountain-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-mountain-700">
-                    Vis ikkje-betalte ({stats.unpaid})
-                  </span>
-                </label>
-                <div className="text-xs text-mountain-500">
-                  ✓ Betalt: {stats.paid} · Totalt: {users.length}
-                </div>
-              </div>
+            <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap bg-mountain-50 px-4 py-2.5 rounded-lg border border-mountain-200 hover:bg-mountain-100 transition-all">
+              <input
+                type="checkbox"
+                checked={showUnpaid}
+                onChange={(e) => setShowUnpaid(e.target.checked)}
+                className="w-4 h-4 rounded border-mountain-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-mountain-700">
+                Vis ubetalte <span className="text-orange-600 font-semibold">({stats.unpaid})</span>
+              </span>
+            </label>
+
+            {/* Stats summary */}
+            <div className="hidden lg:flex items-center gap-3 text-sm text-mountain-600">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                Betalt: {stats.paid}
+              </span>
+              <span>|</span>
+              <span>Totalt: {users.length}</span>
             </div>
           </div>
         </div>
 
         {/* Results count */}
-        {(searchTerm || filterStatus !== 'all' || !showUnpaid || tshirtFilter !== 'all') && (
+        {(searchTerm || !showUnpaid) && (
           <div className="mb-4 text-sm text-mountain-600 bg-blue-50 px-4 py-2 rounded-lg flex items-center justify-between">
             <span><strong>Viser {filteredUsers.length}</strong> av {users.length} deltakarar</span>
             <button
               onClick={() => {
                 setSearchTerm('')
-                setFilterStatus('all')
                 setShowUnpaid(true)
-                setTshirtFilter('all')
               }}
               className="text-primary-600 hover:text-primary-700 font-medium"
             >
@@ -409,13 +392,43 @@ export default function AdminDashboard() {
             <table className="w-full min-w-[800px]">
               <thead className="bg-mountain-50 border-b border-mountain-200">
                 <tr>
-                  <th className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700"></th>
-                  <th className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700">Deltaker</th>
-                  <th className="hidden md:table-cell px-6 py-4 text-left text-sm font-semibold text-mountain-700">Kontakt</th>
-                  <th className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700">Framdrift</th>
-                  <th className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700">Status</th>
-                  <th className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700">Betaling</th>
-                  <th className="hidden lg:table-cell px-6 py-4 text-left text-sm font-semibold text-mountain-700">Registrert</th>
+                  <th className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700 w-8"></th>
+                  <th 
+                    className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700 cursor-pointer hover:bg-mountain-100 transition-colors select-none"
+                    onClick={() => handleSort('name')}
+                  >
+                    Deltaker <SortIcon column="name" />
+                  </th>
+                  <th 
+                    className="hidden md:table-cell px-6 py-4 text-left text-sm font-semibold text-mountain-700 cursor-pointer hover:bg-mountain-100 transition-colors select-none"
+                    onClick={() => handleSort('email')}
+                  >
+                    Kontakt <SortIcon column="email" />
+                  </th>
+                  <th 
+                    className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700 cursor-pointer hover:bg-mountain-100 transition-colors select-none"
+                    onClick={() => handleSort('submissions')}
+                  >
+                    Framdrift <SortIcon column="submissions" />
+                  </th>
+                  <th 
+                    className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700 cursor-pointer hover:bg-mountain-100 transition-colors select-none"
+                    onClick={() => handleSort('tshirtSize')}
+                  >
+                    T-skjorte <SortIcon column="tshirtSize" />
+                  </th>
+                  <th 
+                    className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700 cursor-pointer hover:bg-mountain-100 transition-colors select-none"
+                    onClick={() => handleSort('hasPaid')}
+                  >
+                    Betaling <SortIcon column="hasPaid" />
+                  </th>
+                  <th 
+                    className="hidden lg:table-cell px-6 py-4 text-left text-sm font-semibold text-mountain-700 cursor-pointer hover:bg-mountain-100 transition-colors select-none"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    Registrert <SortIcon column="createdAt" />
+                  </th>
                   <th className="px-3 md:px-6 py-4 text-left text-sm font-semibold text-mountain-700">Handlingar</th>
                 </tr>
               </thead>
@@ -483,22 +496,11 @@ export default function AdminDashboard() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      {user.completedAt ? (
-                        <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Fullført
-                        </div>
-                      ) : user.submissions.length > 0 ? (
-                        <div className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
-                          <Clock className="w-4 h-4" />
-                          I gang
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2 bg-mountain-100 text-mountain-600 px-3 py-1 rounded-full text-sm font-semibold">
-                          Ikkje starta
-                        </div>
-                      )}
+                    <td className="px-3 md:px-6 py-4">
+                      <div className="inline-flex items-center gap-1 bg-mountain-100 text-mountain-700 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-semibold">
+                        <Shirt className="w-3 h-3 md:w-4 md:h-4" />
+                        {user.tshirtSize}
+                      </div>
                     </td>
                     <td className="px-3 md:px-6 py-4">
                       <div className="flex items-center gap-2">
