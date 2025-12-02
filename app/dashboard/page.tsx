@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download } from 'lucide-react'
+import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download, Camera } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { VIPPS_CONFIG, CATALOG_PRICE } from '@/lib/config'
 
@@ -139,6 +139,12 @@ function DashboardContent() {
         method: 'POST',
         body: formData,
       })
+
+      // Handle non-JSON responses
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server-feil ved opplasting. Prøv igjen.')
+      }
 
       const data = await response.json()
 
@@ -510,13 +516,51 @@ function DashboardContent() {
                   <label className="block text-sm font-semibold text-mountain-700 mb-2">
                     Bilete frå toppen *
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    required
-                    onChange={handleImageChange}
-                    className="w-full px-4 py-2 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  />
+                  <label className="block cursor-pointer">
+                    <div className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                      uploadForm.image 
+                        ? 'border-green-400 bg-green-50' 
+                        : 'border-mountain-300 hover:border-primary-400 hover:bg-primary-50'
+                    }`}>
+                      {uploadForm.image ? (
+                        <div className="space-y-2">
+                          <div className="w-16 h-16 mx-auto rounded-lg overflow-hidden bg-mountain-200">
+                            <img 
+                              src={URL.createObjectURL(uploadForm.image)} 
+                              alt="Preview" 
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <p className="text-sm font-medium text-green-700">
+                            ✓ {uploadForm.image.name}
+                          </p>
+                          <p className="text-xs text-mountain-500">
+                            Trykk for å endre bilete
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="w-12 h-12 mx-auto bg-primary-100 rounded-full flex items-center justify-center">
+                            <Camera className="w-6 h-6 text-primary-600" />
+                          </div>
+                          <p className="text-sm font-medium text-mountain-700">
+                            Trykk for å velje bilete
+                          </p>
+                          <p className="text-xs text-mountain-500">
+                            eller dra og slepp her
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      required
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
 
                 <div>
