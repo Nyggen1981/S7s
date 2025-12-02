@@ -1,10 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Mountain, Award, Camera, Users, ExternalLink } from 'lucide-react'
+import InstallPrompt from '@/components/InstallPrompt'
 
 export default function Home() {
   return (
     <div className="min-h-screen">
+      <InstallPrompt />
       {/* Hero Section */}
       <div className="relative h-screen flex items-center justify-center overflow-hidden">
         {/* Background with overlay */}
@@ -259,7 +261,7 @@ export default function Home() {
           
           <div className="border-t border-blue-800 pt-6 text-center text-sm text-gray-400">
             <p className="mb-2">© 2024-2025 Sauda Seven Summits. Alle rettar reservert.</p>
-            <p className="text-xs text-gray-500 mb-2">v25.12.2</p>
+            <p className="text-xs text-gray-500 mb-2">v25.12.3</p>
             <Link 
               href="/admin/login" 
               className="text-primary-300 hover:text-primary-200 transition-colors"

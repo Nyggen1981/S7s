@@ -1,0 +1,25 @@
+{
+  "name": "Sauda Seven Summits",
+  "short_name": "S7S",
+  "description": "Bestig 7 av Saudas gjevaste topper og få den eksklusive S7S-trøya!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e3a5f",
+  "theme_color": "#1e3a5f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/S7S.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/cropped-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
+
