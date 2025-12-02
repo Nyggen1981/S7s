@@ -81,71 +81,56 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleImport = async () => {
-    // Show developer warning
-    const confirmed = confirm(
-      `⚠️ ADVARSEL - KUN FOR UTVIKLAR!\n\n` +
-      `Denne funksjonen er berre for systemutviklar.\n` +
-      `Feil bruk kan føre til tap av data.\n\n` +
-      `Er du sikker på at du vil fortsette?`
-    )
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importStep, setImportStep] = useState<'warning' | 'confirm' | 'result'>('warning')
+  const [importResult, setImportResult] = useState<any>(null)
 
-    if (!confirmed) return
+  const handleImportClick = () => {
+    setImportStep('warning')
+    setImportFile(null)
+    setImportResult(null)
+    setShowImportModal(true)
+  }
 
-    // Create file input and trigger click
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json'
-    
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-
-      // Second confirmation with file name
-      const finalConfirm = confirm(
-        `Du er i ferd med å importere:\n${file.name}\n\n` +
-        `Dette vil legge til nye brukarar frå fila.\n` +
-        `Eksisterande brukarar blir IKKJE overskrive.\n\n` +
-        `Fortsett?`
-      )
-
-      if (!finalConfirm) return
-
-      setImporting(true)
-      try {
-        const text = await file.text()
-        const data = JSON.parse(text)
-
-        const response = await fetch('/api/admin/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        })
-
-        const result = await response.json()
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Import feila')
-        }
-
-        alert(
-          `✅ Import fullført!\n\n` +
-          `Importerte brukarar: ${result.stats.importedUsers}\n` +
-          `Importerte bestigningar: ${result.stats.importedSubmissions}\n` +
-          `Hoppa over (finst allereie): ${result.stats.skippedUsers}`
-        )
-
-        // Reload users
-        await loadUsers()
-      } catch (error: any) {
-        console.error('Import failed:', error)
-        alert(`❌ Import feila: ${error.message}`)
-      } finally {
-        setImporting(false)
-      }
+  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImportFile(file)
+      setImportStep('confirm')
     }
+  }
 
-    input.click()
+  const handleImportConfirm = async () => {
+    if (!importFile) return
+
+    setImporting(true)
+    try {
+      const text = await importFile.text()
+      const data = JSON.parse(text)
+
+      const response = await fetch('/api/admin/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Import feila')
+      }
+
+      setImportResult(result)
+      setImportStep('result')
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Import failed:', error)
+      setImportResult({ error: error.message })
+      setImportStep('result')
+    } finally {
+      setImporting(false)
+    }
   }
 
   const handleSort = (column: string) => {
@@ -312,7 +297,7 @@ export default function AdminDashboard() {
                 <span className="sm:hidden">↓</span>
               </button>
               <button
-                onClick={handleImport}
+                onClick={handleImportClick}
                 disabled={importing}
                 className="flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white px-4 md:px-6 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm md:text-base"
                 title="Kun for utviklar"
@@ -753,6 +738,120 @@ export default function AdminDashboard() {
           Visar {filteredUsers.length} av {users.length} deltakere
         </div>
       </div>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+            {importStep === 'warning' && (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Upload className="w-8 h-8 text-orange-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-mountain-900 mb-2">⚠️ Kun for utviklar!</h2>
+                  <p className="text-mountain-600 text-sm">
+                    Denne funksjonen er berre for systemutviklar.
+                    Feil bruk kan føre til tap av data.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <label className="block">
+                    <span className="text-sm font-medium text-mountain-700 mb-2 block">Vel JSON-fil:</span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportFileSelect}
+                      className="w-full px-4 py-2 border border-mountain-300 rounded-lg"
+                    />
+                  </label>
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="w-full bg-mountain-200 hover:bg-mountain-300 text-mountain-700 py-2 rounded-lg font-semibold"
+                  >
+                    Avbryt
+                  </button>
+                </div>
+              </>
+            )}
+
+            {importStep === 'confirm' && importFile && (
+              <>
+                <div className="text-center mb-6">
+                  <h2 className="text-xl font-bold text-mountain-900 mb-2">Bekreft import</h2>
+                  <p className="text-mountain-600 text-sm mb-4">
+                    Du er i ferd med å importere:
+                  </p>
+                  <p className="bg-mountain-100 px-4 py-2 rounded-lg font-mono text-sm">
+                    {importFile.name}
+                  </p>
+                  <p className="text-mountain-500 text-xs mt-4">
+                    Eksisterande brukarar blir IKKJE overskrive.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="flex-1 bg-mountain-200 hover:bg-mountain-300 text-mountain-700 py-2 rounded-lg font-semibold"
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    onClick={handleImportConfirm}
+                    disabled={importing}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+                  >
+                    {importing ? 'Importerer...' : 'Importer'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {importStep === 'result' && (
+              <>
+                <div className="text-center mb-6">
+                  {importResult?.error ? (
+                    <>
+                      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <XCircle className="w-8 h-8 text-red-600" />
+                      </div>
+                      <h2 className="text-xl font-bold text-red-700 mb-2">Import feila</h2>
+                      <p className="text-mountain-600 text-sm">{importResult.error}</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle2 className="w-8 h-8 text-green-600" />
+                      </div>
+                      <h2 className="text-xl font-bold text-green-700 mb-4">Import fullført!</h2>
+                      <div className="bg-mountain-50 rounded-lg p-4 text-left text-sm">
+                        <div className="flex justify-between mb-2">
+                          <span className="text-mountain-600">Importerte brukarar:</span>
+                          <span className="font-semibold">{importResult?.stats?.importedUsers || 0}</span>
+                        </div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-mountain-600">Importerte bestigningar:</span>
+                          <span className="font-semibold">{importResult?.stats?.importedSubmissions || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-mountain-600">Hoppa over:</span>
+                          <span className="font-semibold">{importResult?.stats?.skippedUsers || 0}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg font-semibold"
+                >
+                  Lukk
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
