@@ -12,17 +12,16 @@ async function main() {
   const defaultPassword = 'S7s2025!' // Default password for existing users
   const hashedPassword = await bcrypt.hash(defaultPassword, 10)
 
+  console.log(`Found ${users.length} users`)
+  
   for (const user of users) {
-    // Check if user needs a password
-    if (!user.password || user.password === '') {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { password: hashedPassword }
-      })
-      console.log(`✅ Password set for: ${user.email}`)
-    } else {
-      console.log(`⏭️  Skipped (already has password): ${user.email}`)
-    }
+    console.log(`Checking user: ${user.email}, has password: ${!!user.password}`)
+    // Set password for all users (overwrite)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    })
+    console.log(`✅ Password set for: ${user.email}`)
   }
 
   console.log('')

@@ -142,7 +142,7 @@ function DashboardContent() {
       }
 
       // Reload user data
-      await loadUserData()
+      await refreshUserData(user.email)
       
       // Reset form
       setSelectedPeak(null)
