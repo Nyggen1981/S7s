@@ -33,9 +33,11 @@ function DashboardContent() {
     
     if (urlEmail) {
       setEmail(urlEmail)
+      setLoading(true) // Start loading immediately
       localStorage.setItem('s7s_user_email', urlEmail)
     } else if (savedEmail) {
       setEmail(savedEmail)
+      setLoading(true) // Start loading immediately
     }
     setInitialLoad(false)
   }, [])
@@ -140,7 +142,8 @@ function DashboardContent() {
     }
   }
 
-  if (initialLoad) {
+  // Show loading while checking auth or loading user data
+  if (initialLoad || (email && !user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
         <div className="text-center">

@@ -15,6 +15,7 @@ function ProfileContent() {
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [initialLoad, setInitialLoad] = useState(true)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -28,10 +29,13 @@ function ProfileContent() {
     
     if (urlEmail) {
       setEmail(urlEmail)
+      setLoading(true)
       localStorage.setItem('s7s_user_email', urlEmail)
     } else if (savedEmail) {
       setEmail(savedEmail)
+      setLoading(true)
     }
+    setInitialLoad(false)
   }, [])
 
   useEffect(() => {
@@ -110,6 +114,18 @@ function ProfileContent() {
       tshirtSize: user.tshirtSize
     })
     setEditing(false)
+  }
+
+  // Show loading while checking auth or loading user data
+  if (initialLoad || (email && !user && loading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-mountain-600">Lastar...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!user) {
