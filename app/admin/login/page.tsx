@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, Lock } from 'lucide-react'
 
@@ -20,14 +18,16 @@ export default function AdminLoginPage() {
     setError('')
 
     try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       })
 
-      if (result?.error) {
-        setError('Ugyldig e-post eller passord')
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Innlogging feila')
       } else {
         router.push('/admin')
         router.refresh()

@@ -1,12 +1,33 @@
-import { getServerSession } from 'next-auth'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth'
+import { jwtVerify } from 'jose'
 import AdminDashboard from '@/components/AdminDashboard'
 
-export default async function AdminPage() {
-  const session = await getServerSession(authOptions)
+const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'fallback-secret')
 
-  if (!session) {
+async function verifyAdmin() {
+  const cookieStore = cookies()
+  const token = cookieStore.get('admin-token')?.value
+
+  if (!token) {
+    return null
+  }
+
+  try {
+    const { payload } = await jwtVerify(token, secret)
+    if (payload.role === 'admin') {
+      return payload
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export default async function AdminPage() {
+  const admin = await verifyAdmin()
+
+  if (!admin) {
     redirect('/admin/login')
   }
 
