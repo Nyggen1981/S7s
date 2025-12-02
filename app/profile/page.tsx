@@ -21,7 +21,7 @@ function ProfileContent() {
     tshirtSize: 'M'
   })
 
-  // Load saved user session on mount
+  // Load saved user session on mount and verify with server
   useEffect(() => {
     const savedUser = localStorage.getItem('s7s_user_session')
     
@@ -34,6 +34,8 @@ function ProfileContent() {
           phone: userData.phone,
           tshirtSize: userData.tshirtSize
         })
+        // Verify user still exists
+        verifyUser(userData.email)
       } catch (e) {
         // If no valid session, redirect to dashboard to login
         router.push('/dashboard')
@@ -44,6 +46,23 @@ function ProfileContent() {
     }
     setInitialLoad(false)
   }, [])
+
+  const verifyUser = async (userEmail: string) => {
+    try {
+      const response = await fetch(`/api/user?email=${encodeURIComponent(userEmail)}`)
+      if (response.status === 404) {
+        // User has been deleted - log them out
+        localStorage.removeItem('s7s_user_session')
+        router.push('/dashboard')
+      } else if (response.ok) {
+        const data = await response.json()
+        setUser(data)
+        localStorage.setItem('s7s_user_session', JSON.stringify(data))
+      }
+    } catch (err) {
+      console.error('Failed to verify user:', err)
+    }
+  }
 
   useEffect(() => {
     if (user) {

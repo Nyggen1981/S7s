@@ -53,6 +53,11 @@ function DashboardContent() {
         const data = await response.json()
         setUser(data)
         localStorage.setItem('s7s_user_session', JSON.stringify(data))
+      } else if (response.status === 404) {
+        // User has been deleted - log them out
+        localStorage.removeItem('s7s_user_session')
+        setUser(null)
+        setEmail('')
       }
     } catch (err) {
       console.error('Failed to refresh user data:', err)
