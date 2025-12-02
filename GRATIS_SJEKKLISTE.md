@@ -179,3 +179,4 @@ Vercel deployar automatisk! (1-2 min)
 
 **Gratulerer! S7S er live! 🎊**
 
+

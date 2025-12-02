@@ -234,3 +234,4 @@ Om noko ikkje fungerer:
 
 **Lykke til! 🏔️**
 
+

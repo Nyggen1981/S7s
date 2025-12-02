@@ -428,3 +428,4 @@ Om du får problem:
 
 **Din S7S-app er no live og 100% gratis!** 🎊
 
+

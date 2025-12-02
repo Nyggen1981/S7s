@@ -42,3 +42,4 @@ openssl rand -base64 32
 
 Eller bruk: https://generate-secret.vercel.app/32
 
+

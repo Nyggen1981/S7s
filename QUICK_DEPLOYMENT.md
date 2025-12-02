@@ -301,3 +301,4 @@ Treng du hjelp? Les `DEPLOYMENT_GUIDE.md` for meir detaljert info!
 
 **Lykke til med Sauda Seven Summits 2025/2026! 🎿⛰️**
 
+
