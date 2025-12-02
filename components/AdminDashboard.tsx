@@ -30,8 +30,9 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in-progress'>('all')
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in-progress' | 'not-started'>('all')
+  const [showUnpaid, setShowUnpaid] = useState(true)
+  const [tshirtFilter, setTshirtFilter] = useState<string>('all')
   const [exporting, setExporting] = useState(false)
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
 
@@ -80,17 +81,19 @@ export default function AdminDashboard() {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.phone.includes(searchTerm)
     
     const matchesFilter = filterStatus === 'all' ||
                          (filterStatus === 'completed' && user.completedAt) ||
-                         (filterStatus === 'in-progress' && !user.completedAt)
+                         (filterStatus === 'in-progress' && !user.completedAt && user.submissions.length > 0) ||
+                         (filterStatus === 'not-started' && user.submissions.length === 0)
     
-    const matchesPayment = paymentFilter === 'all' ||
-                          (paymentFilter === 'paid' && user.hasPaid) ||
-                          (paymentFilter === 'unpaid' && !user.hasPaid)
+    const matchesPayment = showUnpaid || user.hasPaid
     
-    return matchesSearch && matchesFilter && matchesPayment
+    const matchesTshirt = tshirtFilter === 'all' || user.tshirtSize === tshirtFilter
+    
+    return matchesSearch && matchesFilter && matchesPayment && matchesTshirt
   })
 
   const stats = {
@@ -101,6 +104,12 @@ export default function AdminDashboard() {
     paid: users.filter(u => u.hasPaid).length,
     unpaid: users.filter(u => !u.hasPaid).length,
   }
+
+  const tshirtSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+  const tshirtStats = tshirtSizes.reduce((acc, size) => {
+    acc[size] = users.filter(u => u.tshirtSize === size).length
+    return acc
+  }, {} as Record<string, number>)
 
   const handleApprovePayment = async (userId: string, approved: boolean) => {
     try {
@@ -274,95 +283,123 @@ export default function AdminDashboard() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-mountain-400" />
-                <input
-                  type="text"
-                  placeholder="Søk etter namn eller e-post..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => setFilterStatus('all')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  filterStatus === 'all'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                }`}
-              >
-                Alle
-              </button>
-              <button
-                onClick={() => setFilterStatus('completed')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  filterStatus === 'completed'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                }`}
-              >
-                Fullført
-              </button>
-              <button
-                onClick={() => setFilterStatus('in-progress')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  filterStatus === 'in-progress'
-                    ? 'bg-yellow-600 text-white'
-                    : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                }`}
-              >
-                I gang
-              </button>
+          {/* Search */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-mountain-400" />
+              <input
+                type="text"
+                placeholder="Søk etter namn, e-post eller telefon..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              />
             </div>
           </div>
-          
-          {/* Payment Filter */}
-          <div className="mt-4 pt-4 border-t border-mountain-200">
-            <p className="text-sm font-medium text-mountain-700 mb-3">Betalingsstatus:</p>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => setPaymentFilter('all')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  paymentFilter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                }`}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Status Filter */}
+            <div>
+              <p className="text-sm font-medium text-mountain-700 mb-2">Framdrift:</p>
+              <div className="flex gap-1 flex-wrap">
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    filterStatus === 'all'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
+                  }`}
+                >
+                  Alle
+                </button>
+                <button
+                  onClick={() => setFilterStatus('completed')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    filterStatus === 'completed'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
+                  }`}
+                >
+                  Fullført ({stats.completed})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('in-progress')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    filterStatus === 'in-progress'
+                      ? 'bg-yellow-600 text-white'
+                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
+                  }`}
+                >
+                  I gang ({stats.inProgress})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('not-started')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    filterStatus === 'not-started'
+                      ? 'bg-gray-600 text-white'
+                      : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
+                  }`}
+                >
+                  Ikkje starta ({stats.notStarted})
+                </button>
+              </div>
+            </div>
+
+            {/* T-shirt Filter */}
+            <div>
+              <p className="text-sm font-medium text-mountain-700 mb-2">T-skjorte størrelse:</p>
+              <select
+                value={tshirtFilter}
+                onChange={(e) => setTshirtFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
               >
-                Alle ({users.length})
-              </button>
-              <button
-                onClick={() => setPaymentFilter('paid')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  paymentFilter === 'paid'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                }`}
-              >
-                ✓ Betalt ({stats.paid})
-              </button>
-              <button
-                onClick={() => setPaymentFilter('unpaid')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  paymentFilter === 'unpaid'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
-                }`}
-              >
-                $ Ikkje betalt ({stats.unpaid})
-              </button>
+                <option value="all">Alle storleikar</option>
+                {tshirtSizes.map(size => (
+                  <option key={size} value={size}>
+                    {size} ({tshirtStats[size] || 0})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Payment Checkbox */}
+            <div>
+              <p className="text-sm font-medium text-mountain-700 mb-2">Betaling:</p>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showUnpaid}
+                    onChange={(e) => setShowUnpaid(e.target.checked)}
+                    className="w-5 h-5 rounded border-mountain-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-mountain-700">
+                    Vis ikkje-betalte ({stats.unpaid})
+                  </span>
+                </label>
+                <div className="text-xs text-mountain-500">
+                  ✓ Betalt: {stats.paid} · Totalt: {users.length}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Results count */}
-        {(searchTerm || filterStatus !== 'all' || paymentFilter !== 'all') && (
-          <div className="mb-4 text-sm text-mountain-600 bg-blue-50 px-4 py-2 rounded-lg">
-            <strong>Viser {filteredUsers.length}</strong> av {users.length} deltakarar
+        {(searchTerm || filterStatus !== 'all' || !showUnpaid || tshirtFilter !== 'all') && (
+          <div className="mb-4 text-sm text-mountain-600 bg-blue-50 px-4 py-2 rounded-lg flex items-center justify-between">
+            <span><strong>Viser {filteredUsers.length}</strong> av {users.length} deltakarar</span>
+            <button
+              onClick={() => {
+                setSearchTerm('')
+                setFilterStatus('all')
+                setShowUnpaid(true)
+                setTshirtFilter('all')
+              }}
+              className="text-primary-600 hover:text-primary-700 font-medium"
+            >
+              Nullstill filter
+            </button>
           </div>
         )}
 
