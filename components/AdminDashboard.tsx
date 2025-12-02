@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { 
   Users, 
@@ -26,6 +26,7 @@ import NextImage from 'next/image'
 import { formatDate, formatDateTime } from '@/lib/utils'
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -37,6 +38,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadUsers()
   }, [])
+
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' })
+    router.push('/')
+    router.refresh()
+  }
 
   const loadUsers = async () => {
     try {
@@ -179,7 +186,7 @@ export default function AdminDashboard() {
                 <span className="sm:hidden">Excel</span>
               </button>
               <button
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={handleLogout}
                 className="bg-mountain-600 hover:bg-mountain-700 text-white px-4 md:px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 text-sm md:text-base"
               >
                 <LogOut className="w-4 h-4" />
