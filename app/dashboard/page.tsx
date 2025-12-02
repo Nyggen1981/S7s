@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download, Camera } from 'lucide-react'
+import NorwegianDatePicker from '@/components/NorwegianDatePicker'
 import { formatDate } from '@/lib/utils'
 import { VIPPS_CONFIG, CATALOG_PRICE } from '@/lib/config'
 
@@ -501,13 +502,11 @@ function DashboardContent() {
                   <label className="block text-sm font-semibold text-mountain-700 mb-2">
                     Dato for bestiginga *
                   </label>
-                  <input
-                    type="date"
-                    required
+                  <NorwegianDatePicker
                     value={uploadForm.date}
+                    onChange={(date) => setUploadForm({ ...uploadForm, date })}
                     max={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => setUploadForm({ ...uploadForm, date: e.target.value })}
-                    className="w-full px-4 py-3 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    required
                   />
                   <p className="text-xs text-mountain-500 mt-1">Vel datoen du var på toppen</p>
                 </div>
