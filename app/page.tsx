@@ -9,7 +9,14 @@ export default function Home() {
       <div className="relative h-screen flex items-center justify-center overflow-hidden">
         {/* Background with overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-blue-900/40 to-mountain-900/60 z-10"></div>
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920')] bg-cover bg-center"></div>
+        <Image
+          src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80"
+          alt="Mountain background"
+          fill
+          className="object-cover"
+          priority
+          unoptimized
+        />
         
         {/* Content */}
         <div className="relative z-20 text-center text-white px-4 max-w-4xl">
