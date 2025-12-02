@@ -116,7 +116,6 @@ export default function AdminDashboard() {
 
       // Reload users
       await loadUsers()
-      alert(approved ? '✅ Betaling godkjent!' : '❌ Betaling avvist')
     } catch (error) {
       console.error('Error approving payment:', error)
       alert('Kunne ikkje oppdatere betalingsstatus')
@@ -465,27 +464,37 @@ export default function AdminDashboard() {
                       )}
                     </td>
                     <td className="px-3 md:px-6 py-4">
-                      {user.hasPaid ? (
-                        <div className="inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-semibold">
-                          <CheckCircle2 className="w-3 h-3 md:w-4 md:h-4" />
-                          <span className="hidden sm:inline">Betalt</span>
-                          <span className="sm:hidden">✓</span>
-                        </div>
-                      ) : (
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            if (confirm(`Godkjenn betaling for ${user.name}?`)) {
+                            if (user.hasPaid) {
+                              // Revoke payment - show warning
+                              if (confirm(`⚠️ ÅTVARING!\n\nEr du heilt sikker på at du vil fjerne betalingsstatus for ${user.name}?\n\nDette vil fjerne tilgangen til S7S-katalogen.`)) {
+                                handleApprovePayment(user.id, false)
+                              }
+                            } else {
+                              // Approve payment
                               handleApprovePayment(user.id, true)
                             }
                           }}
-                          className="inline-flex items-center gap-1 bg-orange-100 hover:bg-orange-200 text-orange-800 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-semibold transition-all"
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            user.hasPaid 
+                              ? 'bg-green-500 focus:ring-green-500' 
+                              : 'bg-gray-300 focus:ring-gray-400'
+                          }`}
+                          title={user.hasPaid ? 'Klikk for å fjerne betaling' : 'Klikk for å godkjenne betaling'}
                         >
-                          <DollarSign className="w-3 h-3 md:w-4 md:h-4" />
-                          <span className="hidden sm:inline">Godkjenn</span>
-                          <span className="sm:hidden">$</span>
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform ${
+                              user.hasPaid ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
                         </button>
-                      )}
+                        <span className={`text-xs font-medium ${user.hasPaid ? 'text-green-700' : 'text-gray-500'}`}>
+                          {user.hasPaid ? 'Betalt' : 'Ikkje betalt'}
+                        </span>
+                      </div>
                     </td>
                     <td className="hidden lg:table-cell px-6 py-4">
                       <div className="flex items-center gap-2 text-sm text-mountain-600">
