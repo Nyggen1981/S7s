@@ -35,7 +35,7 @@ export default function Home() {
             Sauda Seven Summits
           </h1>
           <p className="text-lg md:text-xl lg:text-2xl mb-8 md:mb-12 drop-shadow-md px-4">
-            Bestig 7 av Saudas gjevaste topper og vinn flotte premier!
+            Bestig 7 av Saudas gjevaste topper og få den eksklusive S7S-trøya!
           </p>
           <div className="flex flex-col items-center gap-3 md:gap-4 px-4">
             <Link 
@@ -154,9 +154,9 @@ export default function Home() {
               <div className="bg-primary-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Award className="w-10 h-10 text-primary-600" />
               </div>
-              <h3 className="text-xl font-semibold mb-3 text-mountain-800">5. Vinn premie</h3>
+              <h3 className="text-xl font-semibold mb-3 text-mountain-800">5. Få T-skjorta</h3>
               <p className="text-mountain-600">
-                Fullfør alle 7 topper og få din premie!
+                Fullfør alle 7 topper og motta den eksklusive S7S-trøya!
               </p>
             </div>
           </div>
