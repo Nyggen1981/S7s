@@ -470,7 +470,7 @@ export default function AdminDashboard() {
                             e.stopPropagation()
                             if (user.hasPaid) {
                               // Revoke payment - show warning
-                              if (confirm(`⚠️ ÅTVARING!\n\nEr du heilt sikker på at du vil fjerne betalingsstatus for ${user.name}?\n\nDette vil fjerne tilgangen til S7S-katalogen.`)) {
+                              if (confirm(`⚠️ ADVARSEL!\n\nEr du heilt sikker på at du vil fjerne betalingsstatus for ${user.name}?\n\nDette vil fjerne tilgangen til S7S-katalogen.`)) {
                                 handleApprovePayment(user.id, false)
                               }
                             } else {
