@@ -30,7 +30,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showUnpaid, setShowUnpaid] = useState(true)
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [sortColumn, setSortColumn] = useState<string>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [exporting, setExporting] = useState(false)
@@ -96,7 +96,9 @@ export default function AdminDashboard() {
                            user.phone.includes(searchTerm) ||
                            user.tshirtSize.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesPayment = showUnpaid || user.hasPaid
+      const matchesPayment = paymentFilter === 'all' ||
+                            (paymentFilter === 'paid' && user.hasPaid) ||
+                            (paymentFilter === 'unpaid' && !user.hasPaid)
       
       return matchesSearch && matchesPayment
     })
@@ -345,18 +347,39 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Payment Checkbox */}
-            <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap bg-mountain-50 px-4 py-2.5 rounded-lg border border-mountain-200 hover:bg-mountain-100 transition-all">
-              <input
-                type="checkbox"
-                checked={showUnpaid}
-                onChange={(e) => setShowUnpaid(e.target.checked)}
-                className="w-4 h-4 rounded border-mountain-300 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm text-mountain-700">
-                Vis ubetalte <span className="text-orange-600 font-semibold">({stats.unpaid})</span>
-              </span>
-            </label>
+            {/* Payment Filter */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPaymentFilter('all')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  paymentFilter === 'all'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-mountain-100 text-mountain-700 hover:bg-mountain-200'
+                }`}
+              >
+                Alle ({stats.total})
+              </button>
+              <button
+                onClick={() => setPaymentFilter('paid')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  paymentFilter === 'paid'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                }`}
+              >
+                ✓ Betalt ({stats.paid})
+              </button>
+              <button
+                onClick={() => setPaymentFilter('unpaid')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  paymentFilter === 'unpaid'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200'
+                }`}
+              >
+                Ikkje betalt ({stats.unpaid})
+              </button>
+            </div>
 
             {/* Stats summary */}
             <div className="hidden lg:flex items-center gap-3 text-sm text-mountain-600">
@@ -371,13 +394,13 @@ export default function AdminDashboard() {
         </div>
 
         {/* Results count */}
-        {(searchTerm || !showUnpaid) && (
+        {(searchTerm || paymentFilter !== 'all') && (
           <div className="mb-4 text-sm text-mountain-600 bg-blue-50 px-4 py-2 rounded-lg flex items-center justify-between">
             <span><strong>Viser {filteredUsers.length}</strong> av {users.length} deltakarar</span>
             <button
               onClick={() => {
                 setSearchTerm('')
-                setShowUnpaid(true)
+                setPaymentFilter('all')
               }}
               className="text-primary-600 hover:text-primary-700 font-medium"
             >
