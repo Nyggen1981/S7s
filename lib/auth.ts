@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 
 export const authOptions: NextAuthOptions = {
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -12,31 +13,44 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
+        console.log('Auth attempt for:', credentials?.email)
+        
         if (!credentials?.email || !credentials?.password) {
+          console.log('Missing credentials')
           return null
         }
 
-        const admin = await prisma.admin.findUnique({
-          where: { email: credentials.email }
-        })
+        try {
+          const admin = await prisma.admin.findUnique({
+            where: { email: credentials.email }
+          })
 
-        if (!admin) {
+          console.log('Admin found:', !!admin)
+
+          if (!admin) {
+            console.log('No admin with this email')
+            return null
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            admin.password
+          )
+
+          console.log('Password valid:', isPasswordValid)
+
+          if (!isPasswordValid) {
+            return null
+          }
+
+          return {
+            id: admin.id,
+            email: admin.email,
+            name: admin.name,
+          }
+        } catch (error) {
+          console.error('Auth error:', error)
           return null
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          admin.password
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
-        return {
-          id: admin.id,
-          email: admin.email,
-          name: admin.name,
         }
       }
     })
@@ -46,6 +60,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/admin/login',
+    error: '/admin/login',
   },
   callbacks: {
     async jwt({ token, user }) {
