@@ -16,3 +16,4 @@ async function main() {
 main()
   .finally(() => prisma.$disconnect())
 
+
