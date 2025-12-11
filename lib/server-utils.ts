@@ -1,10 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
-
-// Create Supabase client for server-side
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+import { writeFile, mkdir } from 'fs/promises'
+import path from 'path'
 
 export async function saveUploadedImage(file: File, userId: string, peakId: string): Promise<string> {
   const bytes = await file.arrayBuffer()
@@ -14,25 +9,15 @@ export async function saveUploadedImage(file: File, userId: string, peakId: stri
   const timestamp = Date.now()
   const ext = file.name.split('.').pop() || 'jpg'
   const filename = `${userId}_${peakId}_${timestamp}.${ext}`
-  const filepath = `peak-images/${filename}`
+  
+  // Ensure uploads directory exists
+  const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
+  await mkdir(uploadsDir, { recursive: true })
+  
+  // Save file to local filesystem
+  const filepath = path.join(uploadsDir, filename)
+  await writeFile(filepath, buffer)
 
-  // Upload to Supabase Storage
-  const { data, error } = await supabase.storage
-    .from('uploads')
-    .upload(filepath, buffer, {
-      contentType: file.type,
-      upsert: false
-    })
-
-  if (error) {
-    console.error('Supabase upload error:', error)
-    throw new Error('Kunne ikkje laste opp bilete')
-  }
-
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from('uploads')
-    .getPublicUrl(filepath)
-
-  return urlData.publicUrl
+  // Return public URL path
+  return `/uploads/${filename}`
 }

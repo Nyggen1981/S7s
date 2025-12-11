@@ -3,6 +3,8 @@ import { jwtVerify } from 'jose'
 
 const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'fallback-secret')
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get('admin-token')?.value
@@ -29,4 +31,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authenticated: false }, { status: 401 })
   }
 }
+
 

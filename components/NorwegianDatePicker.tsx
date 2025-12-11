@@ -165,3 +165,4 @@ export default function NorwegianDatePicker({ value, onChange, max, required }: 
   )
 }
 
+

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { verifyAdminToken } from '@/lib/admin-auth'
 import * as XLSX from 'xlsx'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const admin = await verifyAdminToken()

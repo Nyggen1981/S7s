@@ -2,10 +2,15 @@
 
 Før du deployer, må du sette opp desse environment variables:
 
-## Database
+## Database (Neon)
 ```
-DATABASE_URL="postgresql://user:password@host:5432/database?schema=public"
+DATABASE_URL="postgresql://brukar:passord@ep-xxxx-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require"
+DIRECT_URL="postgresql://brukar:passord@ep-xxxx.eu-west-2.aws.neon.tech/neondb?sslmode=require"
 ```
+
+**Merk:** 
+- `DATABASE_URL` bruker pooler-tilkopling (med `-pooler` i hostname) for betre ytelse
+- `DIRECT_URL` bruker direkte tilkopling (utan `-pooler`) for migrasjonar
 
 ## NextAuth
 ```
@@ -42,4 +47,11 @@ openssl rand -base64 32
 
 Eller bruk: https://generate-secret.vercel.app/32
 
+## Oppsett av Neon Database
 
+1. Gå til [neon.tech](https://neon.tech) og opprett ein konto
+2. Lag eit nytt prosjekt
+3. Kopier connection string frå dashboard
+4. Bruk pooler-URL for `DATABASE_URL` og direkte URL for `DIRECT_URL`
+5. Køyr `npx prisma db push` for å opprette tabellane
+6. Køyr `npx prisma db seed` for å legge inn fjella

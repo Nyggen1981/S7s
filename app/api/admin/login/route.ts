@@ -5,6 +5,8 @@ import { SignJWT } from 'jose'
 
 const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'fallback-secret')
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
@@ -58,4 +60,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Noko gjekk galt' }, { status: 500 })
   }
 }
+
 
