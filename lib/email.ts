@@ -134,25 +134,30 @@ export async function sendCompletionEmail(userName: string, userEmail: string): 
   console.log('=== sendCompletionEmail START ===')
   console.log('User:', userName, userEmail)
   
-  // Check admin settings FIRST
-  const settings = await getAdminSettings()
-  console.log('Admin setting notifyAllPeaksCompleted:', settings.notifyAllPeaksCompleted)
-  
-  if (!settings.notifyAllPeaksCompleted) {
-    console.log('Completion notification DISABLED by admin settings')
-    return false
-  }
+  try {
+    // Check admin settings FIRST
+    console.log('Fetching admin settings...')
+    const settings = await getAdminSettings()
+    console.log('Admin settings fetched:', JSON.stringify(settings))
+    console.log('notifyAllPeaksCompleted:', settings.notifyAllPeaksCompleted)
+    
+    if (!settings.notifyAllPeaksCompleted) {
+      console.log('Completion notification DISABLED by admin settings')
+      return false
+    }
 
-  // Check admin email is set
-  const adminEmail = getAdminEmail()
-  if (!adminEmail) {
-    console.error('Cannot send completion email: ADMIN_EMAIL not configured')
-    return false
-  }
+    // Check admin email is set
+    const adminEmail = getAdminEmail()
+    console.log('Admin email:', adminEmail)
+    
+    if (!adminEmail) {
+      console.error('Cannot send completion email: ADMIN_EMAIL not configured')
+      return false
+    }
+    
+    console.log('Sending completion notification to:', adminEmail)
   
-  console.log('Sending completion notification to:', adminEmail)
-  
-  const mailOptions = {
+    const mailOptions = {
     from: getFromEmail(),
     to: adminEmail,
     subject: '🏔️ Ny deltakar har fullført Sauda Seven Summits!',
@@ -180,9 +185,15 @@ export async function sendCompletionEmail(userName: string, userEmail: string): 
     text: `Gratulerer!\n\nEin deltakar har akkurat fullført alle 7 fjelltopper!\n\nNamn: ${userName}\nE-post: ${userEmail}\nFullført: ${new Date().toLocaleString('no-NO')}\n\nLogg inn på admin-panelet for å sjå alle detaljar.`
   }
 
-  const success = await sendWithRetry(mailOptions, 3, 2000)
-  console.log('=== sendCompletionEmail END, success:', success, '===')
-  return success
+    const success = await sendWithRetry(mailOptions, 3, 2000)
+    console.log('=== sendCompletionEmail END, success:', success, '===')
+    return success
+  } catch (error: any) {
+    console.error('=== sendCompletionEmail CRASHED ===')
+    console.error('Error:', error?.message || error)
+    console.error('Stack:', error?.stack)
+    return false
+  }
 }
 
 // ============================================
