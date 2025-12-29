@@ -46,7 +46,25 @@ async function sendWithRetry(
       console.log(`Email sent successfully on attempt ${attempt}`)
       return true
     } catch (error: any) {
-      console.error(`Email attempt ${attempt} failed:`, error?.message || error)
+      const errorMessage = error?.message || String(error)
+      console.error(`Email attempt ${attempt} failed:`, errorMessage)
+      
+      // Don't retry on timeout - email might have been sent
+      if (errorMessage.toLowerCase().includes('timeout') || 
+          errorMessage.includes('ETIMEDOUT') ||
+          errorMessage.includes('ESOCKET')) {
+        console.log('Timeout error - NOT retrying (email may have been sent)')
+        // Return true to avoid duplicate sends - assume it was sent
+        return true
+      }
+      
+      // Don't retry on authentication errors
+      if (errorMessage.includes('authentication') || 
+          errorMessage.includes('535') ||
+          errorMessage.includes('Invalid login')) {
+        console.error('Authentication error - NOT retrying')
+        return false
+      }
       
       if (attempt < maxRetries) {
         console.log(`Waiting ${delayMs}ms before retry...`)
