@@ -350,7 +350,7 @@ function DashboardContent() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">S7S Katalog 2024/2025</h3>
+                  <h3 className="font-semibold text-lg">S7S Katalog 2025/2026</h3>
                   <p className="text-green-100 text-sm">Du har tilgang til katalogen!</p>
                 </div>
               </div>
