@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
     })
 
     const totalPeaks = await prisma.peak.count()
+    
+    console.log(`Peak submission complete. User ${userId}: ${userSubmissionsCount}/${totalPeaks} peaks`)
 
     // Get user and peak info for notifications
     const user = await prisma.user.findUnique({ where: { id: userId } })
@@ -101,13 +103,19 @@ export async function POST(request: NextRequest) {
 
     // If completed all peaks, update user and send notification
     if (userSubmissionsCount === totalPeaks && user) {
+      console.log(`🎉 User ${user.name} completed ALL ${totalPeaks} peaks! Sending completion email...`)
+      
       await prisma.user.update({
         where: { id: userId },
         data: { completedAt: new Date() }
       })
 
       // Send completion email to admin
-      sendCompletionEmail(user.name, user.email).catch(console.error)
+      sendCompletionEmail(user.name, user.email).catch((err) => {
+        console.error('Failed to send completion email:', err)
+      })
+    } else {
+      console.log(`User has ${userSubmissionsCount}/${totalPeaks} - not complete yet`)
     }
 
     return NextResponse.json({ 
