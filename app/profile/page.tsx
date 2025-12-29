@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, User, Mail, Phone, Shirt, Save, Edit2, X } from 'lucide-react'
+import { ArrowLeft, User, Mail, Phone, Shirt, Save, Edit2, X, Lock, Eye, EyeOff } from 'lucide-react'
 import { TSHIRT_SIZES } from '@/lib/utils'
 
 function ProfileContent() {
@@ -20,6 +20,20 @@ function ProfileContent() {
     phone: '',
     tshirtSize: 'M'
   })
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  })
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
 
   // Load saved user session on mount and verify with server
   useEffect(() => {
@@ -111,6 +125,56 @@ function ProfileContent() {
       tshirtSize: user.tshirtSize
     })
     setEditing(false)
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError('')
+    setPasswordSuccess('')
+
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordError('Alle felt må fylles ut')
+      return
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError('Nytt passord må vere minst 6 teikn')
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('Passorda er ikkje like')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const response = await fetch('/api/user/change-password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunne ikkje endre passord')
+      }
+
+      setPasswordSuccess('Passord oppdatert!')
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setTimeout(() => {
+        setShowPasswordChange(false)
+        setPasswordSuccess('')
+      }, 2000)
+    } catch (err: any) {
+      setPasswordError(err.message)
+    } finally {
+      setChangingPassword(false)
+    }
   }
 
   // Show loading while checking auth
@@ -271,6 +335,111 @@ function ProfileContent() {
                 </button>
               </div>
             )}
+
+            {/* Password Change Section */}
+            <div className="border-t border-mountain-200 pt-6 mt-6">
+              <button
+                onClick={() => setShowPasswordChange(!showPasswordChange)}
+                className="flex items-center gap-2 text-mountain-700 hover:text-mountain-900 font-semibold"
+              >
+                <Lock className="w-4 h-4" />
+                Endre passord
+                <span className="text-mountain-400">{showPasswordChange ? '▲' : '▼'}</span>
+              </button>
+
+              {showPasswordChange && (
+                <div className="mt-4 space-y-4 bg-mountain-50 p-4 rounded-lg">
+                  {passwordError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                      {passwordError}
+                    </div>
+                  )}
+                  {passwordSuccess && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
+                      {passwordSuccess}
+                    </div>
+                  )}
+
+                  {/* Current Password */}
+                  <div>
+                    <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                      Noverande passord
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPasswords.current ? 'text' : 'password'}
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                        className="w-full px-4 py-3 pr-12 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-mountain-500 hover:text-mountain-700"
+                      >
+                        {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                      Nytt passord
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPasswords.new ? 'text' : 'password'}
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                        className="w-full px-4 py-3 pr-12 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="Minst 6 teikn"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-mountain-500 hover:text-mountain-700"
+                      >
+                        {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                      Bekreft nytt passord
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPasswords.confirm ? 'text' : 'password'}
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                        className="w-full px-4 py-3 pr-12 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                        placeholder="Skriv passordet på nytt"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-mountain-500 hover:text-mountain-700"
+                      >
+                        {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={changingPassword}
+                    className="w-full bg-mountain-700 hover:bg-mountain-800 text-white py-3 rounded-lg font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Lock className="w-4 h-4" />
+                    {changingPassword ? 'Endrar passord...' : 'Endre passord'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
