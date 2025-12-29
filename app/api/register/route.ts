@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendWelcomeEmail } from '@/lib/email'
+import { sendWelcomeEmail, sendNewUserNotification } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -50,8 +50,11 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Send welcome email (don't await to not slow down response)
+    // Send welcome email to user (don't await to not slow down response)
     sendWelcomeEmail(name, email).catch(console.error)
+    
+    // Send notification to admin
+    sendNewUserNotification(name, email, phone, tshirtSize).catch(console.error)
 
     return NextResponse.json({ 
       success: true, 

@@ -66,5 +66,13 @@ model Admin {
   createdAt       DateTime        @default(now())
 }
 
+model AdminSettings {
+  id                      String   @id @default("settings")
+  notifyNewUser           Boolean  @default(true)
+  notifyPeakSubmission    Boolean  @default(false)
+  notifyAllPeaksCompleted Boolean  @default(true)
+  updatedAt               DateTime @updatedAt
+}
+
 
 

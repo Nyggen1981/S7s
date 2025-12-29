@@ -21,8 +21,10 @@ import {
   ChevronRight,
   Image as ImageIcon,
   DollarSign,
-  XCircle
+  XCircle,
+  Settings
 } from 'lucide-react'
+import Link from 'next/link'
 import NextImage from 'next/image'
 import { formatDate, formatDateTime } from '@/lib/utils'
 
@@ -306,6 +308,13 @@ export default function AdminDashboard() {
                 <span className="hidden sm:inline">{importing ? 'Importerer...' : 'Importer'}</span>
                 <span className="sm:hidden">↑</span>
               </button>
+              <Link
+                href="/admin/settings"
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 md:px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 text-sm md:text-base"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Innstillingar</span>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="bg-mountain-600 hover:bg-mountain-700 text-white px-4 md:px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 text-sm md:text-base"

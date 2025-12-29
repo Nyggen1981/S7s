@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { saveUploadedImage } from '@/lib/server-utils'
-import { sendCompletionEmail } from '@/lib/email'
+import { sendCompletionEmail, sendPeakSubmissionNotification } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,9 +64,24 @@ export async function POST(request: NextRequest) {
 
     const totalPeaks = await prisma.peak.count()
 
+    // Get user and peak info for notifications
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const peak = await prisma.peak.findUnique({ where: { id: peakId } })
+
+    // Send peak submission notification (if enabled)
+    if (user && peak) {
+      sendPeakSubmissionNotification(
+        user.name,
+        user.email,
+        peak.name,
+        userSubmissionsCount,
+        totalPeaks
+      ).catch(console.error)
+    }
+
     // If completed all peaks, update user and send notification
-    if (userSubmissionsCount === totalPeaks) {
-      const user = await prisma.user.update({
+    if (userSubmissionsCount === totalPeaks && user) {
+      await prisma.user.update({
         where: { id: userId },
         data: { completedAt: new Date() }
       })
