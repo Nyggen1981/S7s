@@ -521,56 +521,75 @@ function DashboardContent() {
                   <label className="block text-sm font-semibold text-mountain-700 mb-2">
                     Bilete frå toppen *
                   </label>
-                  <label className="block cursor-pointer">
-                    <div className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all ${
-                      uploadForm.image 
-                        ? 'border-green-400 bg-green-50' 
-                        : 'border-mountain-300 hover:border-primary-400 hover:bg-primary-50'
-                    }`}>
-                      {uploadForm.image ? (
-                        <div className="space-y-2">
-                          <div className="w-16 h-16 mx-auto rounded-lg overflow-hidden bg-mountain-200">
-                            <img 
-                              src={URL.createObjectURL(uploadForm.image)} 
-                              alt="Preview" 
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <p className="text-sm font-medium text-green-700">
-                            ✓ {uploadForm.image.name}
-                          </p>
-                          <p className="text-xs text-mountain-500">
-                            Trykk for å endre bilete
-                          </p>
+                  
+                  {uploadForm.image ? (
+                    <div className="border-2 border-green-400 bg-green-50 rounded-xl p-6 text-center">
+                      <div className="space-y-2">
+                        <div className="w-20 h-20 mx-auto rounded-lg overflow-hidden bg-mountain-200">
+                          <img 
+                            src={URL.createObjectURL(uploadForm.image)} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-center gap-3">
-                            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                              <Camera className="w-6 h-6 text-primary-600" />
-                            </div>
-                            <span className="text-mountain-400">eller</span>
-                            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                              <ImageIcon className="w-6 h-6 text-primary-600" />
-                            </div>
+                        <p className="text-sm font-medium text-green-700">
+                          ✓ {uploadForm.image.name}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setUploadForm({ ...uploadForm, image: null })}
+                          className="text-xs text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Fjern og velg nytt bilete
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Camera button */}
+                      <label className="block cursor-pointer">
+                        <div className="border-2 border-dashed border-mountain-300 hover:border-primary-400 hover:bg-primary-50 rounded-xl p-4 text-center transition-all">
+                          <div className="w-12 h-12 mx-auto bg-primary-100 rounded-full flex items-center justify-center mb-2">
+                            <Camera className="w-6 h-6 text-primary-600" />
                           </div>
                           <p className="text-sm font-medium text-mountain-700">
-                            Trykk for å velje bilete
+                            Ta bilete
                           </p>
                           <p className="text-xs text-mountain-500">
-                            Ta bilde med kamera eller last opp frå enheten
+                            Bruk kamera
                           </p>
                         </div>
-                      )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                      </label>
+                      
+                      {/* File picker button */}
+                      <label className="block cursor-pointer">
+                        <div className="border-2 border-dashed border-mountain-300 hover:border-primary-400 hover:bg-primary-50 rounded-xl p-4 text-center transition-all">
+                          <div className="w-12 h-12 mx-auto bg-primary-100 rounded-full flex items-center justify-center mb-2">
+                            <ImageIcon className="w-6 h-6 text-primary-600" />
+                          </div>
+                          <p className="text-sm font-medium text-mountain-700">
+                            Vel bilete
+                          </p>
+                          <p className="text-xs text-mountain-500">
+                            Frå galleri
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      required
-                      onChange={handleImageChange}
-                      className="hidden"
-                    />
-                  </label>
+                  )}
                 </div>
 
                 <div>
