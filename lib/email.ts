@@ -43,13 +43,24 @@ async function getAdminSettings() {
 }
 
 export async function sendCompletionEmail(userName: string, userEmail: string) {
+  console.log('sendCompletionEmail called for:', userName, userEmail)
+  
   const settings = await getAdminSettings()
+  console.log('Admin settings for completion email:', settings)
+  
   if (!settings.notifyAllPeaksCompleted) {
-    console.log('Completion notification disabled')
+    console.log('Completion notification disabled by admin settings')
     return
   }
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@saudasevensummits.no'
+  console.log('Sending completion email to:', adminEmail)
+  console.log('SMTP config:', {
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    user: process.env.SMTP_USER ? '***set***' : 'NOT SET',
+    from: process.env.SMTP_FROM
+  })
   
   try {
     await transporter.sendMail({
