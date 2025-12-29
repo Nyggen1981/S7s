@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { saveUploadedImage } from '@/lib/server-utils'
 import { sendCompletionEmail, sendPeakSubmissionNotification } from '@/lib/email'
 
+// Runtime config for Vercel
+export const runtime = 'nodejs'
+export const maxDuration = 30 // 30 seconds timeout for larger uploads
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -15,9 +19,16 @@ export async function POST(request: NextRequest) {
     const submittedDate = formData.get('submittedDate') as string | null
 
     // Validation
-    if (!userId || !peakId || !image) {
+    if (!userId || !peakId) {
       return NextResponse.json(
-        { error: 'Brukar ID, fjell ID og bilete er påkrevd' },
+        { error: 'Brukar ID og fjell ID er påkrevd' },
+        { status: 400 }
+      )
+    }
+
+    if (!image || !(image instanceof File) || image.size === 0) {
+      return NextResponse.json(
+        { error: 'Bilete er påkrevd. Vel eit bilete frå galleriet eller ta eit nytt.' },
         { status: 400 }
       )
     }
@@ -40,7 +51,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Save image
-    const imagePath = await saveUploadedImage(image, userId, peakId)
+    let imagePath: string
+    try {
+      imagePath = await saveUploadedImage(image, userId, peakId)
+    } catch (uploadError: any) {
+      console.error('Image upload failed:', uploadError)
+      return NextResponse.json(
+        { error: uploadError.message || 'Kunne ikkje laste opp bilete' },
+        { status: 400 }
+      )
+    }
 
     // Create submission with custom date if provided
     const submissionDate = submittedDate ? new Date(submittedDate) : new Date()
