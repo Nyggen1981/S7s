@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({ where: { id: userId } })
     const peak = await prisma.peak.findUnique({ where: { id: peakId } })
 
-    // Send peak submission notification (if enabled)
+    // Send peak submission notification (if enabled) - don't await, not critical
     if (user && peak) {
       sendPeakSubmissionNotification(
         user.name,
@@ -110,10 +110,13 @@ export async function POST(request: NextRequest) {
         data: { completedAt: new Date() }
       })
 
-      // Send completion email to admin
-      sendCompletionEmail(user.name, user.email).catch((err) => {
+      // MUST await completion email - otherwise Vercel kills the function before it sends
+      try {
+        const emailSent = await sendCompletionEmail(user.name, user.email)
+        console.log('Completion email result:', emailSent)
+      } catch (err) {
         console.error('Failed to send completion email:', err)
-      })
+      }
     } else {
       console.log(`User has ${userSubmissionsCount}/${totalPeaks} - not complete yet`)
     }
