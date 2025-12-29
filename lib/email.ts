@@ -1,37 +1,89 @@
 import nodemailer from 'nodemailer'
 import { prisma } from '@/lib/prisma'
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || process.env.EMAIL_HOST,
-  port: parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587'),
-  secure: false, // Use STARTTLS (port 587)
-  auth: {
-    user: process.env.SMTP_USER || process.env.EMAIL_USER,
-    pass: process.env.SMTP_PASSWORD || process.env.EMAIL_PASS,
-  },
-  tls: {
-    ciphers: 'SSLv3',
-    rejectUnauthorized: false, // For Office365 compatibility
-  },
-})
+// Create transporter with connection pooling
+const createTransporter = () => {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || process.env.EMAIL_HOST,
+    port: parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587'),
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER || process.env.EMAIL_USER,
+      pass: process.env.SMTP_PASSWORD || process.env.EMAIL_PASS,
+    },
+    tls: {
+      ciphers: 'SSLv3',
+      rejectUnauthorized: false,
+    },
+    // Connection pool settings
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 30000, // 30 seconds
+  })
+}
 
-// Get admin settings
+let transporter = createTransporter()
+
+// Retry helper function
+async function sendWithRetry(
+  mailOptions: nodemailer.SendMailOptions,
+  maxRetries: number = 3,
+  delayMs: number = 2000
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Email attempt ${attempt}/${maxRetries} to: ${mailOptions.to}`)
+      
+      // Recreate transporter on retry to get fresh connection
+      if (attempt > 1) {
+        transporter = createTransporter()
+      }
+      
+      await transporter.sendMail(mailOptions)
+      console.log(`Email sent successfully on attempt ${attempt}`)
+      return true
+    } catch (error: any) {
+      console.error(`Email attempt ${attempt} failed:`, error?.message || error)
+      
+      if (attempt < maxRetries) {
+        console.log(`Waiting ${delayMs}ms before retry...`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        delayMs *= 1.5 // Exponential backoff
+      }
+    }
+  }
+  
+  console.error(`All ${maxRetries} email attempts failed`)
+  return false
+}
+
+// Get admin settings from database
 async function getAdminSettings() {
   try {
     let settings = await prisma.adminSettings.findUnique({
       where: { id: 'settings' }
     })
+    
     if (!settings) {
-      settings = {
-        id: 'settings',
-        notifyNewUser: true,
-        notifyPeakSubmission: false,
-        notifyAllPeaksCompleted: true,
-        updatedAt: new Date()
-      }
+      // Create default settings if not exists
+      settings = await prisma.adminSettings.create({
+        data: {
+          id: 'settings',
+          notifyNewUser: true,
+          notifyPeakSubmission: false,
+          notifyAllPeaksCompleted: true,
+        }
+      })
+      console.log('Created default admin settings')
     }
+    
     return settings
-  } catch {
+  } catch (error) {
+    console.error('Error fetching admin settings:', error)
+    // Return defaults on error
     return {
       id: 'settings',
       notifyNewUser: true,
@@ -42,335 +94,340 @@ async function getAdminSettings() {
   }
 }
 
-export async function sendCompletionEmail(userName: string, userEmail: string) {
-  console.log('sendCompletionEmail called for:', userName, userEmail)
+// Get admin email with validation
+function getAdminEmail(): string | null {
+  const email = process.env.ADMIN_EMAIL
+  if (!email || !email.includes('@')) {
+    console.error('ADMIN_EMAIL not set or invalid')
+    return null
+  }
+  return email
+}
+
+// Get FROM email
+function getFromEmail(): string {
+  return process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@saudasevensummits.no'
+}
+
+// ============================================
+// COMPLETION EMAIL - When user completes all 7
+// ============================================
+export async function sendCompletionEmail(userName: string, userEmail: string): Promise<boolean> {
+  console.log('=== sendCompletionEmail START ===')
+  console.log('User:', userName, userEmail)
   
+  // Check admin settings FIRST
   const settings = await getAdminSettings()
-  console.log('Admin settings for completion email:', settings)
+  console.log('Admin setting notifyAllPeaksCompleted:', settings.notifyAllPeaksCompleted)
   
   if (!settings.notifyAllPeaksCompleted) {
-    console.log('Completion notification disabled by admin settings')
-    return
+    console.log('Completion notification DISABLED by admin settings')
+    return false
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@saudasevensummits.no'
-  console.log('Sending completion email to:', adminEmail)
-  console.log('SMTP config:', {
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    user: process.env.SMTP_USER ? '***set***' : 'NOT SET',
-    from: process.env.SMTP_FROM
-  })
+  // Check admin email is set
+  const adminEmail = getAdminEmail()
+  if (!adminEmail) {
+    console.error('Cannot send completion email: ADMIN_EMAIL not configured')
+    return false
+  }
   
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'noreply@saudasevensummits.no',
-      to: adminEmail,
-      subject: '🏔️ Ny deltaker har fullført Sauda Seven Summits!',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #0f172a;">🎉 Gratulerer!</h1>
-          <p>En deltaker har akkurat fullført alle 7 fjelltopper!</p>
-          <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="color: #334155; margin-top: 0;">Deltaker informasjon:</h2>
-            <p><strong>Navn:</strong> ${userName}</p>
-            <p><strong>Email:</strong> ${userEmail}</p>
+  console.log('Sending completion notification to:', adminEmail)
+  
+  const mailOptions = {
+    from: getFromEmail(),
+    to: adminEmail,
+    subject: '🏔️ Ny deltakar har fullført Sauda Seven Summits!',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8fafc; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #0369a1 0%, #0c4a6e 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Gratulerer!</h1>
+        </div>
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <p style="font-size: 16px; color: #334155;">Ein deltakar har akkurat fullført alle 7 fjelltopper!</p>
+          <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0369a1;">
+            <h2 style="color: #334155; margin-top: 0; font-size: 18px;">Deltakar informasjon:</h2>
+            <p style="margin: 8px 0;"><strong>Namn:</strong> ${userName}</p>
+            <p style="margin: 8px 0;"><strong>E-post:</strong> ${userEmail}</p>
+            <p style="margin: 8px 0;"><strong>Fullført:</strong> ${new Date().toLocaleString('no-NO', { dateStyle: 'full', timeStyle: 'short' })}</p>
           </div>
-          <p>Logg inn på admin-panelet for å se alle detaljer og eksportere data.</p>
-          <a href="${process.env.NEXTAUTH_URL}/admin" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-            Gå til Admin-panel
+          <p style="color: #64748b;">Logg inn på admin-panelet for å sjå alle detaljar og eksportere data.</p>
+          <a href="${process.env.NEXTAUTH_URL || 'https://s7s-woad.vercel.app'}/admin" 
+             style="display: inline-block; background: linear-gradient(135deg, #0369a1 0%, #0c4a6e 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; margin-top: 15px; font-weight: bold;">
+            Gå til Admin-panel →
           </a>
         </div>
-      `,
-    })
-    console.log('Completion email sent successfully')
-  } catch (error) {
-    console.error('Error sending completion email:', error)
+      </div>
+    `,
+    text: `Gratulerer!\n\nEin deltakar har akkurat fullført alle 7 fjelltopper!\n\nNamn: ${userName}\nE-post: ${userEmail}\nFullført: ${new Date().toLocaleString('no-NO')}\n\nLogg inn på admin-panelet for å sjå alle detaljar.`
   }
+
+  const success = await sendWithRetry(mailOptions, 3, 2000)
+  console.log('=== sendCompletionEmail END, success:', success, '===')
+  return success
 }
 
-export async function sendWelcomeEmail(userName: string, userEmail: string) {
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'noreply@saudasevensummits.no',
-      to: userEmail,
-      subject: 'Velkommen til Sauda Seven Summits! 🏔️',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #0f172a;">Velkommen, ${userName}! 🏔️</h1>
-          <p>Takk for at du registrerte deg for Sauda Seven Summits!</p>
-          <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="color: #0369a1; margin-top: 0;">Slik kommer du i gang:</h2>
-            <ol style="color: #334155;">
-              <li>Velg et fjell å bestige</li>
-              <li>Ta et bilde på toppen som bevis</li>
-              <li>Last opp bildet i appen</li>
-              <li>Gjenta for alle 7 topper!</li>
-            </ol>
-          </div>
-          <p>Fullfører du alle 7 topper innen ett år, venter det en premie på deg! 🎁</p>
-          <p style="color: #64748b; font-size: 14px; margin-top: 30px;">Lykke til med utfordringen!</p>
+// ============================================
+// WELCOME EMAIL - To new users
+// ============================================
+export async function sendWelcomeEmail(userName: string, userEmail: string): Promise<boolean> {
+  console.log('Sending welcome email to:', userEmail)
+  
+  const mailOptions = {
+    from: getFromEmail(),
+    to: userEmail,
+    subject: 'Velkommen til Sauda Seven Summits! 🏔️',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #0f172a;">Velkommen, ${userName}! 🏔️</h1>
+        <p>Takk for at du registrerte deg for Sauda Seven Summits!</p>
+        <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h2 style="color: #0369a1; margin-top: 0;">Slik kjem du i gang:</h2>
+          <ol style="color: #334155;">
+            <li>Vel eit fjell å bestige</li>
+            <li>Ta eit bilete på toppen som bevis</li>
+            <li>Last opp biletet i appen</li>
+            <li>Gjenta for alle 7 toppar!</li>
+          </ol>
         </div>
-      `,
-    })
-  } catch (error) {
-    console.error('Error sending welcome email:', error)
+        <p>Fullfører du alle 7 toppar innen eitt år, ventar det ein premie på deg! 🎁</p>
+        <p style="color: #64748b; font-size: 14px; margin-top: 30px;">Lykke til med utfordringa!</p>
+      </div>
+    `,
+    text: `Velkommen, ${userName}!\n\nTakk for at du registrerte deg for Sauda Seven Summits!\n\nSlik kjem du i gang:\n1. Vel eit fjell å bestige\n2. Ta eit bilete på toppen som bevis\n3. Last opp biletet i appen\n4. Gjenta for alle 7 toppar!\n\nFullfører du alle 7 toppar innen eitt år, ventar det ein premie på deg!\n\nLykke til med utfordringa!`
   }
+
+  return await sendWithRetry(mailOptions, 3, 2000)
 }
 
-export async function sendPasswordResetEmail(userEmail: string, newPassword: string, isAdmin: boolean = false) {
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'noreply@saudasevensummits.no',
-      to: userEmail,
-      subject: '🔐 Ditt nye passord for Sauda Seven Summits',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #0f172a;">Passord tilbakestilt</h1>
-          <p>Du har bedt om å tilbakestille passordet ditt for Sauda Seven Summits.</p>
-          <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="color: #92400e; margin-top: 0;">Ditt nye passord:</h2>
-            <p style="font-size: 18px; font-weight: bold; color: #78350f; font-family: monospace; background-color: white; padding: 12px; border-radius: 4px; text-align: center;">
-              ${newPassword}
-            </p>
-          </div>
-          <p style="color: #dc2626; font-weight: bold;">⚠️ Viktig: Endre dette passordet etter innlogging for bedre sikkerhet.</p>
-          <p>Du kan nå logge inn med dette passordet.</p>
-          <a href="${process.env.NEXTAUTH_URL || 'https://s7s-woad.vercel.app'}${isAdmin ? '/admin/login' : '/dashboard'}" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-            Logg inn her
-          </a>
-          <p style="color: #64748b; font-size: 14px; margin-top: 30px;">Hvis du ikke ba om dette, kan du trygt ignorere denne e-posten.</p>
+// ============================================
+// PASSWORD RESET EMAIL
+// ============================================
+export async function sendPasswordResetEmail(userEmail: string, newPassword: string, isAdmin: boolean = false): Promise<boolean> {
+  console.log('Sending password reset email to:', userEmail)
+  
+  const loginUrl = `${process.env.NEXTAUTH_URL || 'https://s7s-woad.vercel.app'}${isAdmin ? '/admin/login' : '/dashboard'}`
+  
+  const mailOptions = {
+    from: getFromEmail(),
+    to: userEmail,
+    subject: '🔐 Ditt nye passord for Sauda Seven Summits',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #0f172a;">Passord tilbakestilt</h1>
+        <p>Du har bedt om å tilbakestille passordet ditt for Sauda Seven Summits.</p>
+        <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h2 style="color: #92400e; margin-top: 0;">Ditt nye passord:</h2>
+          <p style="font-size: 18px; font-weight: bold; color: #78350f; font-family: monospace; background-color: white; padding: 12px; border-radius: 4px; text-align: center;">
+            ${newPassword}
+          </p>
         </div>
-      `,
-    })
-    console.log('Password reset email sent successfully')
-  } catch (error) {
-    console.error('Error sending password reset email:', error)
-    throw error
+        <p style="color: #dc2626; font-weight: bold;">⚠️ Viktig: Endre dette passordet etter innlogging for betre sikkerheit.</p>
+        <a href="${loginUrl}" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
+          Logg inn her
+        </a>
+        <p style="color: #64748b; font-size: 14px; margin-top: 30px;">Viss du ikkje ba om dette, kan du trygt ignorere denne e-posten.</p>
+      </div>
+    `,
+    text: `Passord tilbakestilt\n\nDu har bedt om å tilbakestille passordet ditt for Sauda Seven Summits.\n\nDitt nye passord: ${newPassword}\n\nViktig: Endre dette passordet etter innlogging for betre sikkerheit.\n\nLogg inn her: ${loginUrl}`
   }
+
+  const success = await sendWithRetry(mailOptions, 3, 2000)
+  if (!success) {
+    throw new Error('Kunne ikkje sende e-post. Prøv igjen seinare.')
+  }
+  return success
 }
 
-// Admin notification: New user registered
-export async function sendNewUserNotification(userName: string, userEmail: string, phone: string, tshirtSize: string) {
+// ============================================
+// NEW USER NOTIFICATION - To admin
+// ============================================
+export async function sendNewUserNotification(userName: string, userEmail: string, phone: string, tshirtSize: string): Promise<boolean> {
+  console.log('=== sendNewUserNotification START ===')
+  
+  // Check admin settings FIRST
   const settings = await getAdminSettings()
+  console.log('Admin setting notifyNewUser:', settings.notifyNewUser)
+  
   if (!settings.notifyNewUser) {
-    console.log('New user notification disabled')
-    return
+    console.log('New user notification DISABLED by admin settings')
+    return false
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@saudasevensummits.no'
-  
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'noreply@saudasevensummits.no',
-      to: adminEmail,
-      subject: '👤 Ny brukar registrert - Sauda Seven Summits',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #0f172a;">👤 Ny brukar registrert</h1>
-          <p>Ein ny brukar har registrert seg for Sauda Seven Summits.</p>
-          <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="color: #334155; margin-top: 0;">Brukarinformasjon:</h2>
-            <p><strong>Namn:</strong> ${userName}</p>
-            <p><strong>E-post:</strong> ${userEmail}</p>
-            <p><strong>Telefon:</strong> ${phone}</p>
-            <p><strong>T-skjorte:</strong> ${tshirtSize}</p>
-          </div>
-          <p>Registrert: ${new Date().toLocaleString('no-NO')}</p>
-          <a href="${process.env.NEXTAUTH_URL || 'https://s7s-woad.vercel.app'}/admin" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-            Gå til Admin-panel
-          </a>
-        </div>
-      `,
-      text: `Ny brukar registrert\n\nNamn: ${userName}\nE-post: ${userEmail}\nTelefon: ${phone}\nT-skjorte: ${tshirtSize}\n\nRegistrert: ${new Date().toLocaleString('no-NO')}`
-    })
-    console.log('New user notification sent')
-  } catch (error) {
-    console.error('Error sending new user notification:', error)
+  const adminEmail = getAdminEmail()
+  if (!adminEmail) {
+    console.error('Cannot send new user notification: ADMIN_EMAIL not configured')
+    return false
   }
+  
+  console.log('Sending new user notification to:', adminEmail)
+  
+  const mailOptions = {
+    from: getFromEmail(),
+    to: adminEmail,
+    subject: '👤 Ny brukar registrert - Sauda Seven Summits',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #0f172a;">👤 Ny brukar registrert</h1>
+        <p>Ein ny brukar har registrert seg for Sauda Seven Summits.</p>
+        <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h2 style="color: #334155; margin-top: 0;">Brukarinformasjon:</h2>
+          <p><strong>Namn:</strong> ${userName}</p>
+          <p><strong>E-post:</strong> ${userEmail}</p>
+          <p><strong>Telefon:</strong> ${phone}</p>
+          <p><strong>T-skjorte:</strong> ${tshirtSize}</p>
+        </div>
+        <p>Registrert: ${new Date().toLocaleString('no-NO')}</p>
+        <a href="${process.env.NEXTAUTH_URL || 'https://s7s-woad.vercel.app'}/admin" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
+          Gå til Admin-panel
+        </a>
+      </div>
+    `,
+    text: `Ny brukar registrert\n\nNamn: ${userName}\nE-post: ${userEmail}\nTelefon: ${phone}\nT-skjorte: ${tshirtSize}\n\nRegistrert: ${new Date().toLocaleString('no-NO')}`
+  }
+
+  const success = await sendWithRetry(mailOptions, 3, 2000)
+  console.log('=== sendNewUserNotification END, success:', success, '===')
+  return success
 }
 
-// Admin notification: Peak submission
-export async function sendPeakSubmissionNotification(userName: string, userEmail: string, peakName: string, submissionCount: number, totalPeaks: number) {
+// ============================================
+// PEAK SUBMISSION NOTIFICATION - To admin
+// ============================================
+export async function sendPeakSubmissionNotification(
+  userName: string, 
+  userEmail: string, 
+  peakName: string, 
+  submissionCount: number, 
+  totalPeaks: number
+): Promise<boolean> {
+  console.log('=== sendPeakSubmissionNotification START ===')
+  
+  // Check admin settings FIRST
   const settings = await getAdminSettings()
+  console.log('Admin setting notifyPeakSubmission:', settings.notifyPeakSubmission)
+  
   if (!settings.notifyPeakSubmission) {
-    console.log('Peak submission notification disabled')
-    return
+    console.log('Peak submission notification DISABLED by admin settings')
+    return false
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@saudasevensummits.no'
-  
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'noreply@saudasevensummits.no',
-      to: adminEmail,
-      subject: `🏔️ Ny fjellregistrering: ${peakName} - Sauda Seven Summits`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #0f172a;">🏔️ Ny fjellregistrering</h1>
-          <p>Ein brukar har registrert ein ny fjelltopp.</p>
-          <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="color: #334155; margin-top: 0;">Detaljer:</h2>
-            <p><strong>Brukar:</strong> ${userName}</p>
-            <p><strong>E-post:</strong> ${userEmail}</p>
-            <p><strong>Fjell:</strong> ${peakName}</p>
-            <p><strong>Framgang:</strong> ${submissionCount}/${totalPeaks} toppar</p>
-          </div>
-          <p>Registrert: ${new Date().toLocaleString('no-NO')}</p>
-          <a href="${process.env.NEXTAUTH_URL || 'https://s7s-woad.vercel.app'}/admin" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-            Gå til Admin-panel
-          </a>
-        </div>
-      `,
-      text: `Ny fjellregistrering\n\nBrukar: ${userName}\nE-post: ${userEmail}\nFjell: ${peakName}\nFramgang: ${submissionCount}/${totalPeaks} toppar\n\nRegistrert: ${new Date().toLocaleString('no-NO')}`
-    })
-    console.log('Peak submission notification sent')
-  } catch (error) {
-    console.error('Error sending peak submission notification:', error)
+  const adminEmail = getAdminEmail()
+  if (!adminEmail) {
+    console.error('Cannot send peak notification: ADMIN_EMAIL not configured')
+    return false
   }
+  
+  console.log('Sending peak notification to:', adminEmail)
+  
+  const mailOptions = {
+    from: getFromEmail(),
+    to: adminEmail,
+    subject: `🏔️ Ny fjellregistrering: ${peakName} - Sauda Seven Summits`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #0f172a;">🏔️ Ny fjellregistrering</h1>
+        <p>Ein brukar har registrert ein ny fjelltopp.</p>
+        <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h2 style="color: #334155; margin-top: 0;">Detaljar:</h2>
+          <p><strong>Brukar:</strong> ${userName}</p>
+          <p><strong>E-post:</strong> ${userEmail}</p>
+          <p><strong>Fjell:</strong> ${peakName}</p>
+          <p><strong>Framgang:</strong> ${submissionCount}/${totalPeaks} toppar</p>
+        </div>
+        <p>Registrert: ${new Date().toLocaleString('no-NO')}</p>
+        <a href="${process.env.NEXTAUTH_URL || 'https://s7s-woad.vercel.app'}/admin" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
+          Gå til Admin-panel
+        </a>
+      </div>
+    `,
+    text: `Ny fjellregistrering\n\nBrukar: ${userName}\nE-post: ${userEmail}\nFjell: ${peakName}\nFramgang: ${submissionCount}/${totalPeaks} toppar\n\nRegistrert: ${new Date().toLocaleString('no-NO')}`
+  }
+
+  const success = await sendWithRetry(mailOptions, 3, 2000)
+  console.log('=== sendPeakSubmissionNotification END, success:', success, '===')
+  return success
 }
 
-// Email templates for admin viewing
+// ============================================
+// EMAIL TEMPLATES - For admin viewing
+// ============================================
 export const emailTemplates = {
   welcome: {
     name: 'Velkomstmail',
-    description: 'Sendes til nye brukere ved registrering',
+    description: 'Sendast til nye brukarar ved registrering',
     subject: 'Velkommen til Sauda Seven Summits! 🏔️',
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h1 style="color: #0f172a;">Velkommen, {userName}! 🏔️</h1>
   <p>Takk for at du registrerte deg for Sauda Seven Summits!</p>
   <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-    <h2 style="color: #0369a1; margin-top: 0;">Slik kommer du i gang:</h2>
+    <h2 style="color: #0369a1; margin-top: 0;">Slik kjem du i gang:</h2>
     <ol style="color: #334155;">
-      <li>Velg et fjell å bestige</li>
-      <li>Ta et bilde på toppen som bevis</li>
-      <li>Last opp bildet i appen</li>
-      <li>Gjenta for alle 7 topper!</li>
+      <li>Vel eit fjell å bestige</li>
+      <li>Ta eit bilete på toppen som bevis</li>
+      <li>Last opp biletet i appen</li>
+      <li>Gjenta for alle 7 toppar!</li>
     </ol>
   </div>
-  <p>Fullfører du alle 7 topper innen ett år, venter det en premie på deg! 🎁</p>
-  <p style="color: #64748b; font-size: 14px; margin-top: 30px;">Lykke til med utfordringen!</p>
+  <p>Fullfører du alle 7 toppar innen eitt år, ventar det ein premie på deg! 🎁</p>
 </div>`,
-    plainText: `Velkommen, {userName}!
-
-Takk for at du registrerte deg for Sauda Seven Summits!
-
-Slik kommer du i gang:
-1. Velg et fjell å bestige
-2. Ta et bilde på toppen som bevis
-3. Last opp bildet i appen
-4. Gjenta for alle 7 topper!
-
-Fullfører du alle 7 topper innen ett år, venter det en premie på deg!
-
-Lykke til med utfordringen!`
+    plainText: `Velkommen, {userName}!\n\nTakk for at du registrerte deg for Sauda Seven Summits!\n\nSlik kjem du i gang:\n1. Vel eit fjell å bestige\n2. Ta eit bilete på toppen som bevis\n3. Last opp biletet i appen\n4. Gjenta for alle 7 toppar!\n\nFullfører du alle 7 toppar innen eitt år, ventar det ein premie på deg!`
   },
   completion: {
     name: 'Fullføringsvarsel (til admin)',
-    description: 'Sendes til admin når en bruker fullfører alle 7 topper',
-    subject: '🏔️ Ny deltaker har fullført Sauda Seven Summits!',
+    description: 'Sendast til admin når ein brukar fullfører alle 7 toppar',
+    subject: '🏔️ Ny deltakar har fullført Sauda Seven Summits!',
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h1 style="color: #0f172a;">🎉 Gratulerer!</h1>
-  <p>En deltaker har akkurat fullført alle 7 fjelltopper!</p>
+  <p>Ein deltakar har akkurat fullført alle 7 fjelltopper!</p>
   <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-    <h2 style="color: #334155; margin-top: 0;">Deltaker informasjon:</h2>
-    <p><strong>Navn:</strong> {userName}</p>
-    <p><strong>Email:</strong> {userEmail}</p>
+    <p><strong>Namn:</strong> {userName}</p>
+    <p><strong>E-post:</strong> {userEmail}</p>
   </div>
-  <p>Logg inn på admin-panelet for å se alle detaljer og eksportere data.</p>
-  <a href="{adminUrl}" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-    Gå til Admin-panel
-  </a>
 </div>`,
-    plainText: `Gratulerer!
-
-En deltaker har akkurat fullført alle 7 fjelltopper!
-
-Deltaker informasjon:
-Navn: {userName}
-Email: {userEmail}
-
-Logg inn på admin-panelet for å se alle detaljer og eksportere data.`
+    plainText: `Gratulerer!\n\nEin deltakar har akkurat fullført alle 7 fjelltopper!\n\nNamn: {userName}\nE-post: {userEmail}`
   },
   newUser: {
-    name: 'Ny bruker-varsel (til admin)',
-    description: 'Sendes til admin når en ny bruker registrerer seg',
+    name: 'Ny brukar-varsel (til admin)',
+    description: 'Sendast til admin når ein ny brukar registrerer seg',
     subject: '👤 Ny brukar registrert - Sauda Seven Summits',
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h1 style="color: #0f172a;">👤 Ny brukar registrert</h1>
-  <p>Ein ny brukar har registrert seg for Sauda Seven Summits.</p>
   <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-    <h2 style="color: #334155; margin-top: 0;">Brukarinformasjon:</h2>
     <p><strong>Namn:</strong> {userName}</p>
     <p><strong>E-post:</strong> {userEmail}</p>
     <p><strong>Telefon:</strong> {phone}</p>
     <p><strong>T-skjorte:</strong> {tshirtSize}</p>
   </div>
-  <a href="{adminUrl}" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-    Gå til Admin-panel
-  </a>
 </div>`,
-    plainText: `Ny brukar registrert
-
-Namn: {userName}
-E-post: {userEmail}
-Telefon: {phone}
-T-skjorte: {tshirtSize}`
+    plainText: `Ny brukar registrert\n\nNamn: {userName}\nE-post: {userEmail}\nTelefon: {phone}\nT-skjorte: {tshirtSize}`
   },
   peakSubmission: {
     name: 'Fjellregistrering-varsel (til admin)',
-    description: 'Sendes til admin når en bruker registrerer et fjell',
+    description: 'Sendast til admin når ein brukar registrerer eit fjell',
     subject: '🏔️ Ny fjellregistrering: {peakName}',
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h1 style="color: #0f172a;">🏔️ Ny fjellregistrering</h1>
-  <p>Ein brukar har registrert ein ny fjelltopp.</p>
   <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-    <h2 style="color: #334155; margin-top: 0;">Detaljer:</h2>
     <p><strong>Brukar:</strong> {userName}</p>
-    <p><strong>E-post:</strong> {userEmail}</p>
     <p><strong>Fjell:</strong> {peakName}</p>
     <p><strong>Framgang:</strong> {submissionCount}/{totalPeaks} toppar</p>
   </div>
-  <a href="{adminUrl}" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-    Gå til Admin-panel
-  </a>
 </div>`,
-    plainText: `Ny fjellregistrering
-
-Brukar: {userName}
-E-post: {userEmail}
-Fjell: {peakName}
-Framgang: {submissionCount}/{totalPeaks} toppar`
+    plainText: `Ny fjellregistrering\n\nBrukar: {userName}\nFjell: {peakName}\nFramgang: {submissionCount}/{totalPeaks} toppar`
   },
   passwordReset: {
     name: 'Passord tilbakestilt',
-    description: 'Sendes til bruker når de ber om nytt passord',
+    description: 'Sendast til brukar når dei ber om nytt passord',
     subject: '🔐 Ditt nye passord for Sauda Seven Summits',
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h1 style="color: #0f172a;">Passord tilbakestilt</h1>
-  <p>Du har bedt om å tilbakestille passordet ditt for Sauda Seven Summits.</p>
   <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 20px 0;">
     <h2 style="color: #92400e; margin-top: 0;">Ditt nye passord:</h2>
-    <p style="font-size: 18px; font-weight: bold; color: #78350f; font-family: monospace; background-color: white; padding: 12px; border-radius: 4px; text-align: center;">
-      {newPassword}
-    </p>
+    <p style="font-size: 18px; font-weight: bold; font-family: monospace;">{newPassword}</p>
   </div>
-  <p style="color: #dc2626; font-weight: bold;">⚠️ Viktig: Endre dette passordet etter innlogging for bedre sikkerhet.</p>
-  <a href="{loginUrl}" style="display: inline-block; background-color: #0369a1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px;">
-    Logg inn her
-  </a>
+  <p style="color: #dc2626; font-weight: bold;">⚠️ Endre dette passordet etter innlogging!</p>
 </div>`,
-    plainText: `Passord tilbakestilt
-
-Du har bedt om å tilbakestille passordet ditt for Sauda Seven Summits.
-
-Ditt nye passord: {newPassword}
-
-Viktig: Endre dette passordet etter innlogging for bedre sikkerhet.`
+    plainText: `Passord tilbakestilt\n\nDitt nye passord: {newPassword}\n\nViktig: Endre dette passordet etter innlogging for betre sikkerheit.`
   }
 }
-
-
-
-
-
