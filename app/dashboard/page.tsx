@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download, Camera } from 'lucide-react'
+import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download, Camera, Image as ImageIcon } from 'lucide-react'
 import NorwegianDatePicker from '@/components/NorwegianDatePicker'
 import { formatDate } from '@/lib/utils'
 import { VIPPS_CONFIG, CATALOG_PRICE } from '@/lib/config'
@@ -545,14 +545,20 @@ function DashboardContent() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <div className="w-12 h-12 mx-auto bg-primary-100 rounded-full flex items-center justify-center">
-                            <Camera className="w-6 h-6 text-primary-600" />
+                          <div className="flex items-center justify-center gap-3">
+                            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+                              <Camera className="w-6 h-6 text-primary-600" />
+                            </div>
+                            <span className="text-mountain-400">eller</span>
+                            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+                              <ImageIcon className="w-6 h-6 text-primary-600" />
+                            </div>
                           </div>
                           <p className="text-sm font-medium text-mountain-700">
                             Trykk for å velje bilete
                           </p>
                           <p className="text-xs text-mountain-500">
-                            eller dra og slepp her
+                            Ta bilde med kamera eller last opp frå enheten
                           </p>
                         </div>
                       )}
@@ -560,7 +566,6 @@ function DashboardContent() {
                     <input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       required
                       onChange={handleImageChange}
                       className="hidden"

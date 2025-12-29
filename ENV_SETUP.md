@@ -26,12 +26,26 @@ ADMIN_PASSWORD="dittAdminPassord"
 
 ## E-post (valfritt)
 ```
-EMAIL_FROM="post@saudail.no"
-EMAIL_HOST="smtp.example.com"
-EMAIL_PORT="587"
-EMAIL_USER="din-email@example.com"
-EMAIL_PASS="ditt-passord"
+SMTP_HOST="smtp.office365.com"
+SMTP_PORT="587"
+SMTP_USER="booking@saudail.no"
+SMTP_PASSWORD="Arena-2025"
+SMTP_FROM="booking@saudail.no"
 ```
+
+**Alternativt (gamle variabelnavn støttes også):**
+```
+EMAIL_HOST="smtp.office365.com"
+EMAIL_PORT="587"
+EMAIL_USER="booking@saudail.no"
+EMAIL_PASS="Arena-2025"
+EMAIL_FROM="booking@saudail.no"
+```
+
+**Merk for Office365:**
+- Bruker STARTTLS (port 587)
+- Passordet er det samme som e-postkontoens passord
+- `SMTP_FROM` bør være samme som `SMTP_USER` for Office365
 
 ## Vipps og Katalog
 ```
