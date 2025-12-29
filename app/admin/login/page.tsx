@@ -104,6 +104,12 @@ export default function AdminLoginPage() {
             >
               {loading ? 'Loggar inn...' : 'Logg inn'}
             </button>
+
+            <div className="text-center mt-4">
+              <Link href="/admin/forgot-password" className="text-sm text-mountain-600 hover:text-mountain-700 font-semibold">
+                Glemt passord?
+              </Link>
+            </div>
           </form>
         </div>
       </div>

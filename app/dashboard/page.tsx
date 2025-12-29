@@ -254,6 +254,12 @@ function DashboardContent() {
               </button>
             </form>
 
+            <div className="text-center mt-4">
+              <Link href="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 font-semibold">
+                Glemt passord?
+              </Link>
+            </div>
+
             <p className="text-center text-sm text-mountain-600 mt-6">
               Ikkje registrert enno?{' '}
               <Link href="/register" className="text-primary-600 hover:text-primary-700 font-semibold">
