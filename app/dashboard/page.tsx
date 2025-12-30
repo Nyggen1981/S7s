@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download, Camera, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download, Camera, Image as ImageIcon, Pencil, X } from 'lucide-react'
 import NorwegianDatePicker from '@/components/NorwegianDatePicker'
 import { formatDate } from '@/lib/utils'
 import { VIPPS_CONFIG, CATALOG_PRICE } from '@/lib/config'
@@ -26,6 +26,14 @@ function DashboardContent() {
   })
   const [uploading, setUploading] = useState(false)
   const [initialLoad, setInitialLoad] = useState(true)
+  const [editingSubmission, setEditingSubmission] = useState<any>(null)
+  const [editForm, setEditForm] = useState({
+    date: '',
+    time: '',
+    notes: '',
+    image: null as File | null
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
   const isNew = searchParams.get('new') === 'true'
 
   // Load saved user session on mount
@@ -169,6 +177,65 @@ function DashboardContent() {
     } finally {
       setUploading(false)
     }
+  }
+
+  const handleOpenEdit = (submission: any, peakName: string) => {
+    const submittedAt = new Date(submission.submittedAt)
+    setEditingSubmission({ ...submission, peakName })
+    setEditForm({
+      date: submittedAt.toISOString().split('T')[0],
+      time: submittedAt.toTimeString().slice(0, 5),
+      notes: submission.notes || '',
+      image: null
+    })
+  }
+
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setEditForm({ ...editForm, image: e.target.files[0] })
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!user || !editingSubmission) return
+    
+    setSavingEdit(true)
+    try {
+      const formData = new FormData()
+      formData.append('submissionId', editingSubmission.id)
+      formData.append('userId', user.id)
+      formData.append('newDate', editForm.date)
+      formData.append('newTime', editForm.time)
+      formData.append('newNotes', editForm.notes)
+      if (editForm.image) {
+        formData.append('newImage', editForm.image)
+      }
+
+      const response = await fetch('/api/submission', {
+        method: 'PUT',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunne ikkje oppdatere registrering')
+      }
+
+      // Refresh user data to get updated submission
+      await refreshUserData(user.email)
+      setEditingSubmission(null)
+      setEditForm({ date: '', time: '', notes: '', image: null })
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingSubmission(null)
+    setEditForm({ date: '', time: '', notes: '', image: null })
   }
 
   // Show loading while checking auth or loading user data
@@ -468,9 +535,18 @@ function DashboardContent() {
                         </div>
                       )}
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-green-700 bg-green-100 px-3 py-2 rounded">
-                          <Calendar className="w-4 h-4" />
-                          <span>Fullført {formatDate(new Date(submission.submittedAt))}</span>
+                        <div className="flex items-center justify-between gap-2 text-sm font-semibold text-green-700 bg-green-100 px-3 py-2 rounded">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            <span>Fullført {formatDate(new Date(submission.submittedAt))}</span>
+                          </div>
+                          <button
+                            onClick={() => handleOpenEdit(submission, peak.name)}
+                            className="p-1 hover:bg-green-200 rounded transition-colors"
+                            title="Rediger registrering"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                         <div className="text-xs text-mountain-500 px-3">
                           Kl. {new Date(submission.submittedAt).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' })}
@@ -622,6 +698,156 @@ function DashboardContent() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Submission Modal */}
+        {editingSubmission && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-8 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-mountain-900">
+                  Rediger {editingSubmission.peakName}
+                </h2>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-2 hover:bg-mountain-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-mountain-500" />
+                </button>
+              </div>
+
+              <div className="space-y-5">
+                {/* Current image */}
+                <div>
+                  <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                    Noverande bilete
+                  </label>
+                  <div className="rounded-lg overflow-hidden bg-mountain-100">
+                    <Image
+                      src={editForm.image ? URL.createObjectURL(editForm.image) : editingSubmission.imagePath}
+                      alt="Fjelltopp"
+                      width={400}
+                      height={200}
+                      className="w-full h-48 object-cover"
+                    />
+                  </div>
+                  {editForm.image && (
+                    <p className="text-xs text-green-600 mt-1">✓ Nytt bilete valt: {editForm.image.name}</p>
+                  )}
+                </div>
+
+                {/* Change image */}
+                <div>
+                  <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                    Bytt bilete (valfritt)
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block cursor-pointer">
+                      <div className="border-2 border-dashed border-mountain-300 hover:border-primary-400 hover:bg-primary-50 rounded-xl p-3 text-center transition-all">
+                        <Camera className="w-5 h-5 mx-auto text-primary-600 mb-1" />
+                        <p className="text-xs font-medium text-mountain-700">Ta bilete</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleEditImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <label className="block cursor-pointer">
+                      <div className="border-2 border-dashed border-mountain-300 hover:border-primary-400 hover:bg-primary-50 rounded-xl p-3 text-center transition-all">
+                        <ImageIcon className="w-5 h-5 mx-auto text-primary-600 mb-1" />
+                        <p className="text-xs font-medium text-mountain-700">Frå galleri</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {editForm.image && (
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, image: null })}
+                      className="text-xs text-red-600 hover:text-red-700 mt-2"
+                    >
+                      Fjern nytt bilete
+                    </button>
+                  )}
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                    Dato
+                  </label>
+                  <NorwegianDatePicker
+                    value={editForm.date}
+                    onChange={(date) => setEditForm({ ...editForm, date })}
+                    max={new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </div>
+
+                {/* Time */}
+                <div>
+                  <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                    Tidspunkt
+                  </label>
+                  <input
+                    type="time"
+                    value={editForm.time}
+                    onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
+                    className="w-full px-4 py-2 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-semibold text-mountain-700 mb-2">
+                    Notat (valfritt)
+                  </label>
+                  <textarea
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    className="w-full px-4 py-2 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    rows={3}
+                    placeholder="Korleis var turen?"
+                  />
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={savingEdit}
+                    className="flex-1 bg-mountain-200 hover:bg-mountain-300 text-mountain-700 py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    disabled={savingEdit}
+                    className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {savingEdit ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Lagrar...
+                      </>
+                    ) : (
+                      'Lagre endringar'
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
