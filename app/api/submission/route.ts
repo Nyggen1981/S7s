@@ -13,7 +13,6 @@ export async function PUT(request: NextRequest) {
     let submissionId: string
     let userId: string
     let newDate: string | null = null
-    let newTime: string | null = null
     let newNotes: string | null = null
     let newImage: File | null = null
 
@@ -23,7 +22,6 @@ export async function PUT(request: NextRequest) {
       submissionId = formData.get('submissionId') as string
       userId = formData.get('userId') as string
       newDate = formData.get('newDate') as string | null
-      newTime = formData.get('newTime') as string | null
       newNotes = formData.get('newNotes') as string | null
       const imageFile = formData.get('newImage')
       if (imageFile && imageFile instanceof File && imageFile.size > 0) {
@@ -34,7 +32,6 @@ export async function PUT(request: NextRequest) {
       submissionId = body.submissionId
       userId = body.userId
       newDate = body.newDate
-      newTime = body.newTime
       newNotes = body.newNotes
     }
 
@@ -69,13 +66,12 @@ export async function PUT(request: NextRequest) {
     // Build update data
     const updateData: any = {}
 
-    // Handle date and time update
+    // Handle date update
     if (newDate) {
-      // Combine date with time if provided, otherwise use existing time
-      const existingTime = submission.submittedAt.toTimeString().slice(0, 5) // HH:MM
-      const timeToUse = newTime || existingTime
-      const dateTimeString = `${newDate}T${timeToUse}:00`
-      const dateToSet = new Date(dateTimeString)
+      // Parse the date parts to avoid timezone issues
+      // Set to noon to avoid any date boundary issues
+      const [year, month, day] = newDate.split('-').map(Number)
+      const dateToSet = new Date(year, month - 1, day, 12, 0, 0)
       
       if (dateToSet > new Date()) {
         return NextResponse.json(
@@ -85,11 +81,6 @@ export async function PUT(request: NextRequest) {
       }
       
       updateData.submittedAt = dateToSet
-    } else if (newTime) {
-      // Only time changed, keep existing date
-      const existingDate = submission.submittedAt.toISOString().split('T')[0]
-      const dateTimeString = `${existingDate}T${newTime}:00`
-      updateData.submittedAt = new Date(dateTimeString)
     }
 
     // Handle notes update (can be empty string to clear)

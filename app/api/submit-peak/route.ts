@@ -63,7 +63,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create submission with custom date if provided
-    const submissionDate = submittedDate ? new Date(submittedDate) : new Date()
+    // Parse YYYY-MM-DD as local date to avoid timezone shift
+    let submissionDate: Date
+    if (submittedDate) {
+      const [year, month, day] = submittedDate.split('-').map(Number)
+      submissionDate = new Date(year, month - 1, day, 12, 0, 0) // Set to noon to avoid date boundary issues
+    } else {
+      submissionDate = new Date()
+    }
     
     const submission = await prisma.submission.create({
       data: {

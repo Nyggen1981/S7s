@@ -10,6 +10,21 @@ const MONTHS_NO = [
 
 const DAYS_NO = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
 
+// Helper function to format date as YYYY-MM-DD in LOCAL time (not UTC)
+// This prevents timezone issues where toISOString() can shift the date
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Helper to parse YYYY-MM-DD string as local date (not UTC)
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
 interface NorwegianDatePickerProps {
   value: string
   onChange: (date: string) => void
@@ -20,16 +35,17 @@ interface NorwegianDatePickerProps {
 export default function NorwegianDatePicker({ value, onChange, max, required }: NorwegianDatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [viewDate, setViewDate] = useState(() => {
-    if (value) return new Date(value)
+    if (value) return parseLocalDate(value)
     return new Date()
   })
 
   const today = new Date()
-  const maxDate = max ? new Date(max) : today
+  const maxDate = max ? parseLocalDate(max) : today
 
   const formatDisplayDate = (dateStr: string) => {
     if (!dateStr) return ''
-    const date = new Date(dateStr)
+    // Parse as local date to avoid timezone issues
+    const date = parseLocalDate(dateStr)
     return `${date.getDate()}. ${MONTHS_NO[date.getMonth()]} ${date.getFullYear()}`
   }
 
@@ -45,7 +61,8 @@ export default function NorwegianDatePicker({ value, onChange, max, required }: 
   const handleDateClick = (day: number) => {
     const selected = new Date(viewDate.getFullYear(), viewDate.getMonth(), day)
     if (selected <= maxDate) {
-      const dateStr = selected.toISOString().split('T')[0]
+      // Use local date format to avoid timezone shifting
+      const dateStr = formatLocalDate(selected)
       onChange(dateStr)
       setIsOpen(false)
     }
@@ -70,7 +87,8 @@ export default function NorwegianDatePicker({ value, onChange, max, required }: 
     // Days of month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day)
-      const isSelected = value === date.toISOString().split('T')[0]
+      // Use local date format for comparison to avoid timezone issues
+      const isSelected = value === formatLocalDate(date)
       const isToday = date.toDateString() === today.toDateString()
       const isDisabled = date > maxDate
 

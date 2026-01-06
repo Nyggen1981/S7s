@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, Mountain, Trophy, Calendar, Upload, CheckCircle2, Circle, User, Download, Camera, Image as ImageIcon, Pencil, X } from 'lucide-react'
 import NorwegianDatePicker from '@/components/NorwegianDatePicker'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatLocalDate, getTodayLocalDate } from '@/lib/utils'
 import { VIPPS_CONFIG, CATALOG_PRICE } from '@/lib/config'
 
 function DashboardContent() {
@@ -22,14 +22,13 @@ function DashboardContent() {
   const [uploadForm, setUploadForm] = useState({
     image: null as File | null,
     notes: '',
-    date: new Date().toISOString().split('T')[0] // Today's date as default
+    date: getTodayLocalDate() // Today's date as default (in local time)
   })
   const [uploading, setUploading] = useState(false)
   const [initialLoad, setInitialLoad] = useState(true)
   const [editingSubmission, setEditingSubmission] = useState<any>(null)
   const [editForm, setEditForm] = useState({
     date: '',
-    time: '',
     notes: '',
     image: null as File | null
   })
@@ -166,7 +165,7 @@ function DashboardContent() {
       
       // Reset form
       setSelectedPeak(null)
-      setUploadForm({ image: null, notes: '', date: new Date().toISOString().split('T')[0] })
+      setUploadForm({ image: null, notes: '', date: getTodayLocalDate() })
       
       // Show success message
       if (data.completed) {
@@ -183,8 +182,7 @@ function DashboardContent() {
     const submittedAt = new Date(submission.submittedAt)
     setEditingSubmission({ ...submission, peakName })
     setEditForm({
-      date: submittedAt.toISOString().split('T')[0],
-      time: submittedAt.toTimeString().slice(0, 5),
+      date: formatLocalDate(submittedAt), // Use local date to avoid timezone shift
       notes: submission.notes || '',
       image: null
     })
@@ -205,7 +203,6 @@ function DashboardContent() {
       formData.append('submissionId', editingSubmission.id)
       formData.append('userId', user.id)
       formData.append('newDate', editForm.date)
-      formData.append('newTime', editForm.time)
       formData.append('newNotes', editForm.notes)
       if (editForm.image) {
         formData.append('newImage', editForm.image)
@@ -225,7 +222,7 @@ function DashboardContent() {
       // Refresh user data to get updated submission
       await refreshUserData(user.email)
       setEditingSubmission(null)
-      setEditForm({ date: '', time: '', notes: '', image: null })
+      setEditForm({ date: '', notes: '', image: null })
     } catch (err: any) {
       alert(err.message)
     } finally {
@@ -235,7 +232,7 @@ function DashboardContent() {
 
   const handleCancelEdit = () => {
     setEditingSubmission(null)
-    setEditForm({ date: '', time: '', notes: '', image: null })
+    setEditForm({ date: '', notes: '', image: null })
   }
 
   // Show loading while checking auth or loading user data
@@ -534,23 +531,18 @@ function DashboardContent() {
                           />
                         </div>
                       )}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2 text-sm font-semibold text-green-700 bg-green-100 px-3 py-2 rounded">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            <span>Fullført {formatDate(new Date(submission.submittedAt))}</span>
-                          </div>
-                          <button
-                            onClick={() => handleOpenEdit(submission, peak.name)}
-                            className="p-1 hover:bg-green-200 rounded transition-colors"
-                            title="Rediger registrering"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
+                      <div className="flex items-center justify-between gap-2 text-sm font-semibold text-green-700 bg-green-100 px-3 py-2 rounded">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>Fullført {formatDate(new Date(submission.submittedAt))}</span>
                         </div>
-                        <div className="text-xs text-mountain-500 px-3">
-                          Kl. {new Date(submission.submittedAt).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
+                        <button
+                          onClick={() => handleOpenEdit(submission, peak.name)}
+                          className="p-1 hover:bg-green-200 rounded transition-colors"
+                          title="Rediger registrering"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                       {submission.notes && (
                         <p className="text-sm text-mountain-600 mt-2 italic px-3">{submission.notes}</p>
@@ -587,7 +579,7 @@ function DashboardContent() {
                   <NorwegianDatePicker
                     value={uploadForm.date}
                     onChange={(date) => setUploadForm({ ...uploadForm, date })}
-                    max={new Date().toISOString().split('T')[0]}
+                    max={getTodayLocalDate()}
                     required
                   />
                   <p className="text-xs text-mountain-500 mt-1">Vel datoen du var på toppen</p>
@@ -789,21 +781,8 @@ function DashboardContent() {
                   <NorwegianDatePicker
                     value={editForm.date}
                     onChange={(date) => setEditForm({ ...editForm, date })}
-                    max={new Date().toISOString().split('T')[0]}
+                    max={getTodayLocalDate()}
                     required
-                  />
-                </div>
-
-                {/* Time */}
-                <div>
-                  <label className="block text-sm font-semibold text-mountain-700 mb-2">
-                    Tidspunkt
-                  </label>
-                  <input
-                    type="time"
-                    value={editForm.time}
-                    onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
-                    className="w-full px-4 py-2 border border-mountain-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   />
                 </div>
 
